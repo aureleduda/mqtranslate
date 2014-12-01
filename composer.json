@@ -33,7 +33,5 @@
   "conflict": {
     "wpackagist/qtranslate": "dev-master",
     "wpackagist-plugin/qtranslate": "dev-master"
-  },
-  "minimum-stability": "dev",
-  "prefer-stable": true
+  }
 }
