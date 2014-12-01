@@ -299,7 +299,7 @@ function qtrans_getCurrentPostType() {
 		return  $current_screen->post_type;
 	} elseif( isset( $_REQUEST['post_type'] ) ){
 		return  sanitize_key( $_REQUEST['post_type'] );
-	}elseif (get_post_type($_REQUEST['post'])){
+	}elseif (isset($_REQUEST['post']) && get_post_type($_REQUEST['post'])){
 		return get_post_type($_REQUEST['post']);
 	}
 	if( $post_type = apply_filters( 'qtrans_testCustomPostType', "" ) ) return $post_type;
