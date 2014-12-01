@@ -13,10 +13,10 @@ Tags: multilingual, multi, language, admin, tinymce, mqTranslate, Polyglot, bili
 	FOTW Flags Of The World website at http://flagspot.net/flags/
 	(http://www.crwflags.com/FOTW/FLAGS/wflags.html)
 */
-/*  
+/*
 	Original qTranslate source code
 	Copyright 2008  Qian Qin  (email : mail@qianqin.de)
-	
+
 	mqTranslate
 	Copyright 2013  Christophe SAUVEUR - xhaleera  (email : support@xhaleera.com)
 
@@ -42,7 +42,7 @@ Tags: multilingual, multi, language, admin, tinymce, mqTranslate, Polyglot, bili
 	fi by Tatu Siltanen
 	fr by Damien Choizit
 	nl by RobV
-	sv by bear3556, johdah 
+	sv by bear3556, johdah
 	it by Lorenzo De Tomasi
 	ro, hu by Jani Monoses
 	ja by Brian Parker
@@ -52,7 +52,7 @@ Tags: multilingual, multi, language, admin, tinymce, mqTranslate, Polyglot, bili
 	pt by netolazaro
 	gl by Andrés Bott
 	sr by Borisa Djuraskovic from WebHostingHub <http://www.webhostinghub.com>
-	
+
 	Plugin Translation Contributers
 	===============================
 	en, de by Qian Qin
@@ -78,7 +78,7 @@ Tags: multilingual, multi, language, admin, tinymce, mqTranslate, Polyglot, bili
 	ru by viaestvita
 	ro by ipuiu
 	sv by tobi
-	
+
 	Sponsored Features
 	==================
 	Excerpt Translation by bastiaan van rooden (www.nothing.ch)
@@ -100,6 +100,7 @@ define('QT_BOOLEAN',	2);
 define('QT_INTEGER',	3);
 define('QT_URL',		4);
 define('QT_LANGUAGE',	5);
+define('QT_ARRAY',		6);
 define('QT_URL_QUERY',	1);
 define('QT_URL_PATH',	2);
 define('QT_URL_DOMAIN',	3);
@@ -111,8 +112,11 @@ define('QT_STRFTIME',			4);
 // enable the use of following languages (order=>language)
 $q_config['enabled_languages'] = array(
 		'0' => 'de',
-		'1' => 'en', 
+		'1' => 'en',
 		'2' => 'zh'
+	);
+$q_config['ignored_custompost'] = array(
+
 	);
 
 // sets default language
@@ -131,7 +135,7 @@ $q_config['auto_update_mo'] = true;
 // hide language tag for default language
 $q_config['hide_default_language'] = true;
 
-// sets default url mode 
+// sets default url mode
 // QT_URL_QUERY - query (questionmark)
 // QT_URL_PATH - pre-path
 // QT_URL_DOMAIN - pre-domain

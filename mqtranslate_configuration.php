@@ -20,22 +20,22 @@
 /* mqTranslate Management Interface */
 function qtrans_adminMenu() {
 	global $menu, $submenu, $q_config;
-	
+
 	/* Configuration Page */
 	add_options_page(__('Language Management', 'mqtranslate'), __('Languages', 'mqtranslate'), 'manage_options', 'mqtranslate', 'mqtranslate_conf');
-	
+
 	/* Language Switcher for Admin */
-	
+
 	// don't display menu if there is only 1 language active
 	if(sizeof($q_config['enabled_languages']) <= 1) return;
-	
+
 	// generate menu with flags for every enabled language
 	foreach($q_config['enabled_languages'] as $id => $language) {
 		$link = add_query_arg('lang', $language);
 		$link = (strpos($link, "wp-admin/") === false) ? preg_replace('#[^?&]*/#i', '', $link) : preg_replace('#[^?&]*wp-admin/#i', '', $link);
 		if(strpos($link, "?")===0||strpos($link, "index.php?")===0) {
-			if(current_user_can('manage_options')) 
-				$link = 'options-general.php?page=mqtranslate&godashboard=1&lang='.$language; 
+			if(current_user_can('manage_options'))
+				$link = 'options-general.php?page=mqtranslate&godashboard=1&lang='.$language;
 			else
 				$link = 'edit.php?lang='.$language;
 		}
@@ -55,7 +55,7 @@ function mqtranslate_language_form($lang = '', $language_code = '', $language_na
 </div>
 <div class="form-field">
 	<label for="language_flag"><?php _e('Flag', 'mqtranslate') ?></label>
-	<?php 
+	<?php
 	$files = array();
 	if($dir_handle = @opendir(trailingslashit(WP_CONTENT_DIR).$q_config['flag_location'])) {
 		while (false !== ($file = readdir($dir_handle))) {
@@ -90,7 +90,7 @@ function mqtranslate_language_form($lang = '', $language_code = '', $language_na
 		document.getElementById('preview_flag').style.display = "inline";
 		document.getElementById('preview_flag').src = "<?php echo trailingslashit(WP_CONTENT_URL).$q_config['flag_location'];?>" + url;
 	}
-	
+
 	switch_flag(document.getElementById('language_flag').value);
 //]]>
 </script>
@@ -133,6 +133,7 @@ function qtrans_checkSetting($var, $updateOption = false, $type = QT_STRING) {
 	switch($type) {
 		case QT_URL:
 			$_POST[$var] = trailingslashit($_POST[$var]);
+		case QT_ARRAY:
 		case QT_LANGUAGE:
 		case QT_STRING:
 			if(isset($_POST['submit']) && isset($_POST[$var])) {
@@ -193,13 +194,13 @@ function qtrans_language_columns($columns) {
 
 function mqtranslate_conf() {
 	global $q_config, $wpdb;
-	
+
 	// do redirection for dashboard
 	if(isset($_GET['godashboard'])) {
 		echo '<h2>'.__('Switching Language', 'mqtranslate').'</h2>'.sprintf(__('Switching language to %1$s... If the Dashboard isn\'t loading, use this <a href="%2$s" title="Dashboard">link</a>.','mqtranslate'),$q_config['language_name'][qtrans_getLanguage()],admin_url()).'<script type="text/javascript">document.location="'.admin_url().'";</script>';
 		exit();
 	}
-	
+
 	// init some needed variables
 	$error = '';
 	$original_lang = '';
@@ -212,14 +213,15 @@ function mqtranslate_conf() {
 	$language_flag = '';
 	$language_default = '';
 	$altered_table = false;
-	
+
 	$message = apply_filters('mqtranslate_configuration_pre','');
-	
+
 	// check for action
 	if(isset($_POST['mqtranslate_reset']) && isset($_POST['mqtranslate_reset2'])) {
 		$message = __('mqTranslate has been reset.', 'mqtranslate');
 	} elseif(isset($_POST['default_language'])) {
 		// save settings
+		qtrans_checkSetting('ignored_custompost',		true, QT_ARRAY);
 		qtrans_checkSetting('default_language',			true, QT_LANGUAGE);
 		qtrans_checkSetting('flag_location',			true, QT_URL);
 		qtrans_checkSetting('ignore_file_types',		true, QT_STRING);
@@ -231,7 +233,7 @@ function mqtranslate_conf() {
 		qtrans_checkSetting('auto_update_mo',			true, QT_BOOLEAN);
 		qtrans_checkSetting('hide_default_language',	true, QT_BOOLEAN);
 		qtrans_checkSetting('disable_header_css',		true, QT_BOOLEAN);
-		
+
 		if (isset($_POST['allowed_custom_post_types']))
 		{
 			$acpt = explode(',', trim(trim($_POST['allowed_custom_post_types']), ','));
@@ -240,11 +242,11 @@ function mqtranslate_conf() {
 			$acpt = implode(',', $acpt);
 			update_option('mqtranslate_allowed_custom_post_types', $acpt);
 		}
-		
+
 		if(isset($_POST['update_mo_now']) && $_POST['update_mo_now']=='1' && qtrans_updateGettextDatabases(true))
 			$message = __('Gettext databases updated.', 'mqtranslate');
 	}
-	
+
 	if(isset($_POST['original_lang'])) {
 		// validate form input
 		if($_POST['language_na_message']=='')		$error = __('The Language must have a Not-Available Message!', 'mqtranslate');
@@ -255,8 +257,8 @@ function mqtranslate_conf() {
 			// new language
 			if(isset($q_config['language_name'][$_POST['language_code']])) {
 				$error = __('There is already a language with the same Language Code!', 'mqtranslate');
-			} 
-		} 
+			}
+		}
 		if($_POST['original_lang']!=''&&$error=='') {
 			// language update
 			if($_POST['language_code']!=$_POST['original_lang']&&isset($q_config['language_name'][$_POST['language_code']])) {
@@ -411,7 +413,7 @@ function mqtranslate_conf() {
 			}
 		}
 	}
-	
+
 	$everything_fine = ((isset($_POST['submit'])||isset($_GET['delete'])||isset($_GET['enable'])||isset($_GET['disable'])||isset($_GET['moveup'])||isset($_GET['movedown']))&&$error=='');
 	if($everything_fine) {
 		// settings might have changed, so save
@@ -452,7 +454,7 @@ function mqtranslate_conf() {
 </div>
 <?php } else { ?>
 <div class="wrap">
-<h2><?php _e('Language Management (mqTranslate Configuration)', 'mqtranslate'); ?></h2> 
+<h2><?php _e('Language Management (mqTranslate Configuration)', 'mqtranslate'); ?></h2>
 <div class="tablenav"><?php printf(__('For help on how to configure mqTranslate correctly, take a look at the <a href="%1$s">qTranslate FAQ</a> and the <a href="%2$s">Support Forum</a>.', 'mqtranslate'), 'http://www.qianqin.de/qtranslate/faq/', 'http://www.qianqin.de/qtranslate/forum/viewforum.php?f=3'); ?></div>
 	<form action="<?php echo $clean_uri;?>" method="post">
 		<h3><?php _e('General Settings', 'mqtranslate') ?></h3>
@@ -487,7 +489,7 @@ function mqtranslate_conf() {
 					<small>
 					<?php _e('When checked, posts will be hidden if the content is not available for the selected language. If unchecked, a message will appear showing all the languages the content is available in.', 'mqtranslate'); ?>
 					<?php _e('This function will not work correctly if you installed mqTranslate on a blog with existing entries. In this case you will need to take a look at "Convert Database" under "Advanced Settings".', 'mqtranslate'); ?>
-					
+
 					<br /><br />
 					<label for="show_displayed_language_prefix"><input type="checkbox" name="show_displayed_language_prefix" id="show_displayed_language_prefix" value="1"<?php echo $q_config['show_displayed_language_prefix'] ? ' checked="checked"' : ''; ?>/> <?php _e('Show displayed language prefix when Content is not available for the selected language.', 'mqtranslate'); ?></label>
 					</small>
@@ -571,6 +573,19 @@ function mqtranslate_conf() {
 					<label><input type="radio" name="use_strftime" value="<?php echo QT_STRFTIME; ?>" <?php echo ($q_config['use_strftime']==QT_STRFTIME)?' checked="checked"':''; ?>/> <?php _e('Use strftime instead of date.', 'mqtranslate'); ?></label><br />
 					<label><input type="radio" name="use_strftime" value="<?php echo QT_STRFTIME_OVERRIDE; ?>" <?php echo ($q_config['use_strftime']==QT_STRFTIME_OVERRIDE)?' checked="checked"':''; ?>/> <?php _e('Use strftime instead of date and replace formats with the predefined formats for each language.', 'mqtranslate'); ?></label><br />
 					<small><?php _e('Depending on the mode selected, additional customizations of the theme may be needed.', 'mqtranslate'); ?></small>
+				</td>
+			</tr>
+			<tr valign="top">
+				<th scope="row"><?php _e('Ignore custom posts', 'mqtranslate');?></th>
+				<td>
+					<?php $post_types = $q_config['ignored_custompost'] ?>
+					<select id="ignored_custompost" name="ignored_custompost[]" multiple="multiple">
+					<?php foreach (qtrans_getPicklistOptions() as $key => $value) : ?>
+						<option value="<?php echo $key ?>" <?php echo in_array($key, $post_types) ? 'selected="selected"' : '' ?>><?php echo $value ?></option>
+					<?php endforeach ?>
+					</select>
+					<br/>
+					<small><?php _e('Turn off multilingual support for this custom types', 'mqtranslate');?></small>
 				</td>
 			</tr>
 			<tr valign="top">
