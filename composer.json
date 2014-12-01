@@ -31,8 +31,8 @@
     "php": ">=5.3.3"
   },
   "conflict": {
-    "wpackagist/qtranslate": "*",
-    "wpackagist-plugin/qtranslate": "*"
+    "wpackagist/qtranslate": "dev-master",
+    "wpackagist-plugin/qtranslate": "dev-master"
   },
   "minimum-stability": "dev",
   "prefer-stable": true
