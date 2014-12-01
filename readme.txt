@@ -70,6 +70,10 @@ For Problems with mqTranslate-specific features, visits [our Support Page](http:
 
 == Changelog ==
 
+2.8.1:
+
+- Added post-type exclude support
+
 2.8:
 
 - Fixed potential bug with HTTPS (thanks to twisterss)
