@@ -64,7 +64,7 @@ function qtrans_localeForCurrentLanguage($locale) {
 	return $q_config['locale'][$q_config['language']];
 }
 
-function qtrans_optionFilter($do='enable') {
+function qtrans_optionFilter($do = true) {
 	$options = array(	'option_widget_pages',
 						'option_widget_archives',
 						'option_widget_meta',
@@ -76,12 +76,12 @@ function qtrans_optionFilter($do='enable') {
 						'option_widget_rss',
 						'option_widget_tag_cloud'
 					);
-	foreach($options as $option) {
-		if($do!='disable') {
+	
+	foreach ($options as $option) {
+		if ($do)
 			add_filter($option, 'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage',0);
-		} else {
+		else
 			remove_filter($option, 'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage');
-		}
 	}
 }
 
@@ -102,7 +102,7 @@ function qtrans_adminHeader() {
 	echo "#post-body-content .postarea { margin-bottom: 10px; }";
 	do_action('mqtranslate_css');
 	echo "</style>\n";
-	return qtrans_optionFilter('disable');
+	return qtrans_optionFilter(false);
 }
 
 function qtrans_useCurrentLanguageIfNotFoundShowAvailable($content) {
@@ -139,7 +139,7 @@ function qtrans_excludePages($pages) {
 	static $exclude = 0;
 	if(!$q_config['hide_untranslated']) return $pages;
 	if(is_array($exclude)) return array_merge($exclude, $pages);
-	$query = "SELECT id FROM $wpdb->posts WHERE post_type = 'page' AND post_status = 'publish' AND NOT ($wpdb->posts.post_content LIKE '%<!--:".qtrans_getLanguage()."-->%')" ;
+	$query = "SELECT id FROM $wpdb->posts WHERE post_type = 'page' AND post_status = 'publish' AND NOT ($wpdb->posts.post_title LIKE '%<!--:".qtrans_getLanguage()."-->%')" ;
 	$hide_pages = $wpdb->get_results($query);
 	$exclude = array();
 	foreach($hide_pages as $page) {
@@ -225,8 +225,10 @@ function qtrans_checkCanonical($redirect_url, $requested_url) {
 
 function qtrans_fixAdminBar($wp_admin_bar) {
 	global $wp_admin_bar;
-	foreach($wp_admin_bar->get_nodes() as $node) {
-		$wp_admin_bar->add_node(qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage($node));
+	$nodes = $wp_admin_bar->get_nodes();
+	if (is_array($nodes)) {
+		foreach($wp_admin_bar->get_nodes() as $node)
+			$wp_admin_bar->add_node(qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage($node));
 	}
 }
 
@@ -274,7 +276,7 @@ add_filter('get_comment_time',				'qtrans_timeFromCommentForCurrentLanguage',0,4
 add_filter('get_post_modified_time',		'qtrans_timeModifiedFromPostForCurrentLanguage',0,3);
 add_filter('get_the_time',					'qtrans_timeFromPostForCurrentLanguage',0,3);
 add_filter('get_the_date',					'qtrans_dateFromPostForCurrentLanguage',0,2);
-add_filter('get_the_modified_date',			'qtrans_dateFromPostForCurrentLanguage',0,2);
+add_filter('get_the_modified_date',			'qtrans_dateModifiedFromPostForCurrentLanguage',0,2);
 add_filter('locale',						'qtrans_localeForCurrentLanguage',99);
 add_filter('the_title',						'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage', 0);
 add_filter('term_name',						'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage',0);
@@ -305,6 +307,7 @@ add_filter('the_author',					'qtrans_useCurrentLanguageIfNotFoundUseDefaultLangu
 add_filter( "_wp_post_revision_field_post_title", 'qtrans_showAllSeperated', 0);
 add_filter( "_wp_post_revision_field_post_content", 'qtrans_showAllSeperated', 0);
 add_filter( "_wp_post_revision_field_post_excerpt", 'qtrans_showAllSeperated', 0);
+add_filter('get_the_author_description', 	'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage');
 
 // Hooks (execution time non-critical filters) 
 add_filter('author_feed_link',				'qtrans_convertURL');

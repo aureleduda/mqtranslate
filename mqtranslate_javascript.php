@@ -235,28 +235,41 @@ function qtrans_initJS() {
 		jQuery('.wp-editor-wrap').unbind('mousedown');
 		jQuery('.wp-editor-wrap').mousedown(function(e){
 			wpActiveEditor = 'qtrans_textarea_'+this.id.slice(3, -5);
+			jQuery('#insert-media-button').data('editor', 'qtrans_textarea_' + this.id.slice(3, -5));
 		});
 		";
 	
 	$q_config['js']['qtrans_updateTinyMCE'] = "
 		(function() {
-			for (var i in tinyMCEPreInit.qtInit) {
-				var tmp = tinyMCEPreInit.qtInit[i];
-				tmp.id = 'qtrans_textarea_'+tmp.id;
-				tinyMCEPreInit.qtInit[tmp.id] = tmp;
-				delete tinyMCEPreInit.qtInit[i];
-				jQuery('#ed_toolbar').hide();
-			}
-			
+			var tmp = tinyMCEPreInit.qtInit['content'];
+			tmp.id = 'qtrans_textarea_'+tmp.id;
+			tinyMCEPreInit.qtInit[tmp.id] = tmp;
+			delete tinyMCEPreInit.qtInit['content'];
+			jQuery('#ed_toolbar').hide();
+
 			var hook = tinyMCEPreInit.mceInit['content'];
-			hook.elements='hook-to-nothing';
-			hook.selector = '#qtrans_textarea_content';
-			delete tinyMCEPreInit.mceInit['content'];
-			tinyMCEPreInit.mceInit['qtrans_textarea_content'] = hook;
-			
-			var wrap = jQuery('#wp-content-wrap');
-			var html = '<div id=\"wp-qtrans_textarea_content-wrap\" class=\"' + wrap.prop('className') + '\"></div>';
-			jQuery('body').append(html);
+			if (hook)
+			{
+				// Removing WPFullscreen plugin and button
+				var p;
+				if ( typeof hook.plugins != 'undefined' ) {
+					p = hook.plugins.split(',').filter(function(element) { return (element != 'wpfullscreen'); });
+					hook.plugins = p.join(',');
+				}
+				if ( typeof hook.toolbar1 != 'undefined' ) {
+					p = hook.toolbar1.split(',').filter(function(element) { return (element != 'wp_fullscreen'); });
+					hook.toolbar1 = p.join(',');
+				}
+
+				hook.elements='hook-to-nothing';
+				hook.selector = '#qtrans_textarea_content';
+				delete tinyMCEPreInit.mceInit['content'];
+				tinyMCEPreInit.mceInit['qtrans_textarea_content'] = hook;
+				
+				var wrap = jQuery('#wp-content-wrap');
+				var html = '<div id=\"wp-qtrans_textarea_content-wrap\" class=\"' + wrap.prop('className') + '\"></div>';
+				jQuery('body').append(html);
+			}
 		}());
 	";
 	
@@ -273,13 +286,8 @@ function qtrans_initJS() {
 			jQuery('#qtrans_imsg').hide();
 			qtrans_editorInit3();
 			
-			var h = getUserSetting( 'ed_size' );
-			if(h<300) h = 300;
-			
 			jQuery('#content').hide();
 			if ( getUserSetting( 'editor' ) == 'html' ) {
-				if ( h )
-					jQuery('#qtrans_textarea_content').css('height', h - 20 + 'px');
 				jQuery('#qtrans_textarea_content').show();
 			} else {
 				// Activate TinyMCE if it's the user's default editor
@@ -296,8 +304,21 @@ function qtrans_initJS() {
 		qtrans_hook_on_tinyMCE = function(id, initEditor) {
 			tinyMCEPreInit.mceInit[id].setup = function(ed) {
 				ed.on('SaveContent', function(e) {
-					if (!ed.isHidden())
-						qtrans_save(switchEditors.pre_wpautop(e.content));
+					if (!ed.isHidden() && ed.id.match(/^qtrans_/)) {
+						e.content = e.content.replace( /<p>(<br ?\/?>|\u00a0|\uFEFF)?<\/p>/g, '<p>&nbsp;</p>' );
+						if (ed.id.match(/^qtrans_/)) {
+							qtrans_save(switchEditors.pre_wpautop(e.content));
+						}
+					}
+				});
+				ed.on('init', function(e) {
+					var content_ifr = document.getElementById('content_ifr');
+					if (!content_ifr) {
+						content_ifr = jQuery('<div id=\"content_ifr\" style=\"display: none\"></div>').appendTo('body');
+						setInterval(function() {
+							content_ifr.css('height', jQuery('#qtrans_textarea_content_ifr').css('height'));
+						}, 100);
+					}
 				});
 			};
 			
@@ -346,7 +367,12 @@ function qtrans_initJS() {
 	";
 	
 	$q_config['js']['qtrans_switch'] = "
+		switchEditors.go_original = switchEditors.go;
 		switchEditors.go = function(id, lang) {
+			if (id != 'content' ) {
+				switchEditors.go_original(id);
+				return;
+			}
 			id = id || 'qtrans_textarea_content';
 			lang = lang || 'toggle';
 			

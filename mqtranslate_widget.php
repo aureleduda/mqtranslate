@@ -19,113 +19,75 @@
 
 /* mqTranslate Widget */
 
-class mqTranslateWidget extends WP_Widget {
-	function mqTranslateWidget() {
-		$widget_ops = array('classname' => 'widget_mqtranslate', 'description' => __('Allows your visitors to choose a Language.','mqtranslate') );
-		$this->WP_Widget('mqtranslate', __('mqTranslate Language Chooser','mqtranslate'), $widget_ops);
-	}
-	
-	function widget($args, $instance) {
-		extract($args);
-		
-		echo $before_widget;
-		$title = empty($instance['title']) ? __('Language', 'mqtranslate') : apply_filters('widget_title', $instance['title']);
-		$hide_title = empty($instance['hide-title']) ? false : 'on';
-		$type = $instance['type'];
-		if($type!='text'&&$type!='image'&&$type!='both'&&$type!='dropdown') $type='text';
-
-		if($hide_title!='on') { echo $before_title . $title . $after_title; };
-		qtrans_generateLanguageSelectCode($type, $this->id);
-		echo $after_widget;
-	}
-	
-	function update($new_instance, $old_instance) {
-		$instance = $old_instance;
-		$instance['title'] = $new_instance['title'];
-		if(isset($new_instance['hide-title'])) $instance['hide-title'] = $new_instance['hide-title'];
-		$instance['type'] = $new_instance['type'];
-
-		return $instance;
-	}
-	
-	function form($instance) {
-		$instance = wp_parse_args( (array) $instance, array( 'title' => '', 'hide-title' => false, 'type' => 'text' ) );
-		$title = $instance['title'];
-		$hide_title = $instance['hide-title'];
-		$type = $instance['type'];
-?>
-		<p><label for="<?php echo $this->get_field_id('title'); ?>"><?php _e('Title:', 'mqtranslate'); ?> <input class="widefat" id="<?php echo $this->get_field_id('title'); ?>" name="<?php echo $this->get_field_name('title'); ?>" type="text" value="<?php echo esc_attr($title); ?>" /></label></p>
-		<p><label for="<?php echo $this->get_field_id('hide-title'); ?>"><?php _e('Hide Title:', 'mqtranslate'); ?> <input type="checkbox" id="<?php echo $this->get_field_id('hide-title'); ?>" name="<?php echo $this->get_field_name('hide-title'); ?>" <?php echo ($hide_title=='on')?'checked="checked"':''; ?>/></label></p>
-		<p><?php _e('Display:', 'mqtranslate'); ?></p>
-		<p><label for="<?php echo $this->get_field_id('type'); ?>1"><input type="radio" name="<?php echo $this->get_field_name('type'); ?>" id="<?php echo $this->get_field_id('type'); ?>1" value="text"<?php echo ($type=='text')?' checked="checked"':'' ?>/> <?php _e('Text only', 'mqtranslate'); ?></label></p>
-		<p><label for="<?php echo $this->get_field_id('type'); ?>2"><input type="radio" name="<?php echo $this->get_field_name('type'); ?>" id="<?php echo $this->get_field_id('type'); ?>2" value="image"<?php echo ($type=='image')?' checked="checked"':'' ?>/> <?php _e('Image only', 'mqtranslate'); ?></label></p>
-		<p><label for="<?php echo $this->get_field_id('type'); ?>3"><input type="radio" name="<?php echo $this->get_field_name('type'); ?>" id="<?php echo $this->get_field_id('type'); ?>3" value="both"<?php echo ($type=='both')?' checked="checked"':'' ?>/> <?php _e('Text and Image', 'mqtranslate'); ?></label></p>
-		<p><label for="<?php echo $this->get_field_id('type'); ?>4"><input type="radio" name="<?php echo $this->get_field_name('type'); ?>" id="<?php echo $this->get_field_id('type'); ?>4" value="dropdown"<?php echo ($type=='dropdown')?' checked="checked"':'' ?>/> <?php _e('Dropdown Box', 'mqtranslate'); ?></label></p>
-<?php
-	}
-}
-
 // Language Select Code for non-Widget users
 function qtrans_generateLanguageSelectCode($style='', $id='') {
-	global $q_config;
-	if($style=='') $style='text';
-	if(is_bool($style)&&$style) $style='image';
-	if(is_404()) $url = get_option('home'); else $url = '';
-	if($id=='') $id = 'mqtranslate';
-	$id .= '-chooser';
-	switch($style) {
-		case 'image':
-		case 'text':
-		case 'dropdown':
-			echo '<ul class="qtrans_language_chooser" id="'.$id.'">';
-			foreach(qtrans_getSortedLanguages() as $language) {
-				$classes = array('lang-'.$language);
-				if($language == $q_config['language'])
-					$classes[] = 'active';
-				echo '<li class="'. implode(' ', $classes) .'"><a href="'.qtrans_convertURL($url, $language).'"';
-				// set hreflang
-				echo ' hreflang="'.$language.'" title="'.$q_config['language_name'][$language].'"';
-				if($style=='image')
-					echo ' class="qtrans_flag qtrans_flag_'.$language.'"';
-				echo '><span';
-				if($style=='image')
-					echo ' style="display:none"';
-				echo '>'.$q_config['language_name'][$language].'</span></a></li>';
-			}
-			echo "</ul><div class=\"qtrans_widget_end\"></div>";
-			if($style=='dropdown') {
-				echo "<script type=\"text/javascript\">\n// <![CDATA[\r\n";
-				echo "var lc = document.getElementById('".$id."');\n";
-				echo "var s = document.createElement('select');\n";
-				echo "s.id = 'qtrans_select_".$id."';\n";
-				echo "lc.parentNode.insertBefore(s,lc);";
-				// create dropdown fields for each language
+	if (function_exists('is_plugin_active') && is_plugin_active('qtranslate-slug/qtranslate-slug.php'))
+		qts_language_menu($style, array( 'id' => $id, 'short' => '' ) );
+	else
+	{
+		global $q_config;
+		if($style=='') $style='text';
+		if(is_bool($style)&&$style) $style='image';
+		if(is_404()) $url = get_option('home'); else $url = '';
+		if($id=='') $id = 'mqtranslate';
+		$id .= '-chooser';
+		switch($style) {
+			case 'image':
+			case 'text':
+			case 'dropdown':
+				echo '<ul class="qtrans_language_chooser" id="'.$id.'">';
 				foreach(qtrans_getSortedLanguages() as $language) {
-					echo qtrans_insertDropDownElement($language, qtrans_convertURL($url, $language), $id);
+					$classes = array('lang-'.$language);
+					if($language == $q_config['language'])
+						$classes[] = 'active';
+					echo '<li class="'. implode(' ', $classes) .'"><a href="'.qtrans_convertURL($url, $language).'"';
+					// set hreflang
+					echo ' hreflang="'.$language.'" title="'.$q_config['language_name'][$language].'"';
+					if($style=='image')
+						echo ' class="qtrans_flag qtrans_flag_'.$language.'"';
+					echo '><span';
+					if($style=='image')
+						echo ' style="display:none"';
+					echo '>'.$q_config['language_name'][$language].'</span></a></li>';
 				}
-				// hide html language chooser text
-				echo "s.onchange = function() { document.location.href = this.value;}\n";
-				echo "lc.style.display='none';\n";
-				echo "// ]]>\n</script>\n";
-			}
-			break;
-		case 'both':
-			echo '<ul class="qtrans_language_chooser" id="'.$id.'">';
-			foreach(qtrans_getSortedLanguages() as $language) {
-				echo '<li';
-				if($language == $q_config['language'])
-					echo ' class="active"';
-				echo '><a href="'.qtrans_convertURL($url, $language).'"';
-				echo ' class="qtrans_flag_'.$language.' qtrans_flag_and_text" title="'.$q_config['language_name'][$language].'"';
-				echo '><span>'.$q_config['language_name'][$language].'</span></a></li>';
-			}
-			echo "</ul><div class=\"qtrans_widget_end\"></div>";
-			break;
+				echo "</ul><div class=\"qtrans_widget_end\"></div>";
+				if($style=='dropdown') {
+					echo "<script type=\"text/javascript\">\n// <![CDATA[\r\n";
+					echo "var lc = document.getElementById('".$id."');\n";
+					echo "var s = document.createElement('select');\n";
+					echo "s.id = 'qtrans_select_".$id."';\n";
+					echo "lc.parentNode.insertBefore(s,lc);";
+					// create dropdown fields for each language
+					foreach(qtrans_getSortedLanguages() as $language) {
+						echo qtrans_insertDropDownElement($language, qtrans_convertURL($url, $language), $id);
+					}
+					// hide html language chooser text
+					echo "s.onchange = function() { document.location.href = this.value;}\n";
+					echo "lc.style.display='none';\n";
+					echo "// ]]>\n</script>\n";
+				}
+				break;
+			case 'both':
+				echo '<ul class="qtrans_language_chooser" id="'.$id.'">';
+				foreach(qtrans_getSortedLanguages() as $language) {
+					echo '<li';
+					if($language == $q_config['language'])
+						echo ' class="active"';
+					echo '><a href="'.qtrans_convertURL($url, $language).'"';
+					echo ' class="qtrans_flag_'.$language.' qtrans_flag_and_text" title="'.$q_config['language_name'][$language].'"';
+					echo '><span>'.$q_config['language_name'][$language].'</span></a></li>';
+				}
+				echo "</ul><div class=\"qtrans_widget_end\"></div>";
+				break;
+		}
 	}
 }
 
 function qtrans_widget_init() {
+	if (function_exists('is_plugin_active') && is_plugin_active('qtranslate-slug/qtranslate-slug.php'))
+		require_once('mqtranslate_widget_qtranslate-slug.php');
+	else
+		require_once('mqtranslate_widget.inc.php');
 	register_widget('mqTranslateWidget');
 }
-
 ?>

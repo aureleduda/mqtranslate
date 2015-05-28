@@ -67,8 +67,8 @@ $qs_error_messages[QS_DEBUG] =							__('The server returned a debugging message
 add_action('mqtranslate_css',					'qs_css');
 add_action('qs_cron_hook',						'qs_cron');
 add_action('mqtranslate_configuration',			'qs_config_hook');
-add_action('mqtranslate_loadConfig',				'qs_load');
-add_action('mqtranslate_saveConfig',				'qs_save');
+add_action('mqtranslate_loadConfig',			'qs_load');
+add_action('mqtranslate_saveConfig',			'qs_save');
 add_action('mqtranslate_clean_uri',				'qs_clean_uri');
 add_action('admin_menu',						'qs_init');
 add_action('wp_ajax_qs_quote', 					'qs_quote');
@@ -367,8 +367,8 @@ function qs_order_columns($columns) {
 function qs_config_hook($request_uri) {
 	global $q_config;
 ?>
-<h3><?php _e('qTranslate Services Settings', 'mqtranslate') ?><span id="mqtranslate-show-services" style="display:none"> (<a name="mqtranslate_service_settings" href="#mqtranslate_service_settings" onclick="showServices();"><?php _e('Show', 'mqtranslate'); ?></a>)</span></h3>
-<table class="form-table" id="mqtranslate-services">
+<h3><?php _e('qTranslate Services Settings', 'mqtranslate') ?><span id="mqtranslate-show-services"> (<a name="mqtranslate_service_settings" href="#" onclick="return showServices();"><?php _e('Show / Hide', 'mqtranslate'); ?></a>)</span></h3>
+<table class="form-table" id="mqtranslate-services" style="display: none">
 	<tr>
 		<th scope="row"><?php _e('qTranslate Services', 'mqtranslate') ?></th>
 		<td>
@@ -468,14 +468,12 @@ function qs_config_hook($request_uri) {
 <script type="text/javascript">
 // <![CDATA[
 	function showServices() {
-		document.getElementById('mqtranslate-services').style.display='block';
-		document.getElementById('mqtranslate-show-services').style.display='none';
+		var el = document.getElementById('mqtranslate-services');
+		if (el.style.display == 'block')
+			el.style.display = 'none';
+		else
+			el.style.display='block';
 		return false;
-	}
-	
-	if(location.hash!='#mqtranslate_service_settings') {
-	document.getElementById('mqtranslate-show-services').style.display='inline';
-	document.getElementById('mqtranslate-services').style.display='none';
 	}
 // ]]>
 </script>

@@ -41,9 +41,16 @@ function qtrans_init() {
 		delete_option('mqtranslate_url_mode');
 		delete_option('mqtranslate_detect_browser_language');
 		delete_option('mqtranslate_hide_untranslated');
+		delete_option('mqtranslate_show_displayed_language_prefix');
 		delete_option('mqtranslate_auto_update_mo');
 		delete_option('mqtranslate_next_update_mo');
 		delete_option('mqtranslate_hide_default_language');
+		delete_option('mqtranslate_ul_lang_protection');
+		delete_option('mqtranslate_allowed_custom_post_types');
+		delete_option('mqtranslate_disable_header_css');
+		delete_option('mqtranslate_disable_client_cookies');
+		delete_option('mqtranslate_use_secure_cookie');
+		delete_option('mqtranslate_filter_all_options');
 		if(isset($_POST['mqtranslate_reset3'])) {
 			delete_option('mqtranslate_term_name');
 		}
@@ -78,22 +85,32 @@ function qtrans_init() {
 	$q_config['url_info'] = qtrans_extractURL($_SERVER['REQUEST_URI'], $_SERVER["HTTP_HOST"], isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '');
 	
 	// set test cookie
-	setcookie('qtrans_cookie_test', 'mqTranslate Cookie Test', 0, $q_config['url_info']['home'], $q_config['url_info']['host']);
+	if (empty($q_config['disable_client_cookies']) || defined('WP_ADMIN'))
+		setcookie('qtrans_cookie_test', 1, 0, $q_config['url_info']['home'], $q_config['url_info']['host_wo_port'], !empty($q_config['use_secure_cookie']));
 	// check cookies for admin
 	if(defined('WP_ADMIN')) {
 		if(isset($_GET['lang']) && qtrans_isEnabled($_GET['lang'])) {
-			$q_config['language'] = $q_config['url_info']['language'];
-			setcookie('qtrans_admin_language', $q_config['language'], time()+60*60*24*30);
-		} elseif(isset($_COOKIE['qtrans_admin_language']) && qtrans_isEnabled($_COOKIE['qtrans_admin_language'])) {
-			$q_config['language'] = $_COOKIE['qtrans_admin_language'];
-		} else {
-			$q_config['language'] = $q_config['default_language'];
+			qtrans_setLanguage($q_config['url_info']['language']);
+			setcookie('qtrans_admin_language', $q_config['language'], time()+60*60*24*30, NULL, NULL, !empty($q_config['use_secure_cookie']));
 		}
-	} else {
-		$q_config['language'] = $q_config['url_info']['language'];
+		elseif (isset($_COOKIE['qtrans_admin_language']) && qtrans_isEnabled($_COOKIE['qtrans_admin_language']))
+			qtrans_setLanguage($_COOKIE['qtrans_admin_language']);
+		else
+			qtrans_setLanguage($q_config['default_language']);
 	}
-	
-	$q_config['language'] = apply_filters('mqtranslate_language', $q_config['language']);
+	else {
+		qtrans_setLanguage($q_config['url_info']['language']);
+		/*
+		if (!isset($_COOKIE['qtrans_client_language']) || !qtrans_isEnabled($_COOKIE['qtrans_client_language'])
+				|| (($q_config['url_info']['language'] != $q_config['default_language'] || $q_config['url_info']['explicit_default_language']) && $q_config['url_info']['language'] != $_COOKIE['qtrans_client_language'])) {
+			qtrans_setLanguage($q_config['url_info']['language']);
+			if (empty($q_config['disable_client_cookies']))
+				setcookie('qtrans_client_language', $q_config['language'], time() + 86400 * 30, $q_config['url_info']['home'], $q_config['url_info']['host_wo_port'], !empty($q_config['use_secure_cookie']));
+		}
+		else
+			qtrans_setLanguage($_COOKIE['qtrans_client_language']);
+		*/
+	}
 	
 	// detect language and forward if needed
 	if($q_config['detect_browser_language'] && $q_config['url_info']['redirect'] && !isset($_COOKIE['qtrans_cookie_test']) && $q_config['url_info']['language'] == $q_config['default_language']) {
@@ -115,7 +132,7 @@ function qtrans_init() {
 				if(strlen($language)>2) $language = substr($language,0,2);
 				if(qtrans_isEnabled($language)) {
 					if($q_config['hide_default_language'] && $language == $q_config['default_language']) break;
-					$target = qtrans_convertURL(get_option('home'),$language);
+					$target = qtrans_convertURL(qtrans_getHome(),$language);
 					break;
 				}
 			}
@@ -137,18 +154,39 @@ function qtrans_init() {
 	*/
 	
 	// Filter all options for language tags
-	if(!defined('WP_ADMIN')) {
+	if(!defined('WP_ADMIN') && !empty($q_config['filter_all_options'])) {
 		$alloptions = wp_load_alloptions();
 		foreach($alloptions as $option => $value) {
 			add_filter('option_'.$option, 'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage',0);
 		}
 	}
 	
+	// Disable CSS in head if applying
+	if ($q_config['disable_header_css'])
+		add_filter('mqtranslate_header_css', create_function('$a', "return '';"));
+	
 	// load plugin translations
 	load_plugin_textdomain('mqtranslate', false, dirname(plugin_basename( __FILE__ )).'/lang');
 	
 	// fix url to prevent xss
 	$q_config['url_info']['url'] = qtrans_convertURL(add_query_arg('lang',$q_config['default_language'],$q_config['url_info']['url']));
+}
+
+function qtrans_setLanguage($lang) {
+	global $q_config;
+	
+	$q_config['language'] = apply_filters('mqtranslate_language', $lang);
+}
+
+// returns the home in HTTP or HTTPS depending on the request
+function qtrans_getHome() {
+       $home = get_option('home');
+       if(is_ssl()) {
+               $home = str_replace('http://', 'https://', $home);
+       } else {
+               $home = str_replace('https://', 'http://', $home);
+       }
+       return $home;
 }
 
 function qtrans_postInit() {
@@ -162,7 +200,7 @@ function qtrans_postInit() {
 // returns cleaned string and language information
 function qtrans_extractURL($url, $host = '', $referer = '') {
 	global $q_config;
-	$home = qtrans_parseURL(get_option('home'));
+	$home = qtrans_parseURL(qtrans_getHome());
 	$home['path'] = trailingslashit($home['path']);
 	$referer = qtrans_parseURL($referer);
 	
@@ -174,8 +212,12 @@ function qtrans_extractURL($url, $host = '', $referer = '') {
 	$result['redirect'] = false;
 	$result['internal_referer'] = false;
 	$result['home'] = $home['path'];
+	$result['explicit_default_language'] = false;
 	
 	switch($q_config['url_mode']) {
+		case QT_URL_QUERY:
+			$result['explicit_default_language'] = (!empty($_GET['lang']) && $_GET['lang'] == $q_config['default_language']);
+			break;
 		case QT_URL_PATH:
 			// pre url
 			$url = substr($url, strlen($home['path']));
@@ -185,6 +227,7 @@ function qtrans_extractURL($url, $host = '', $referer = '') {
 					if(qtrans_isEnabled($match[1])) {
 						// found language information
 						$result['language'] = $match[1];
+						$result['explicit_default_language'] = ($match[1] == $q_config['default_language']);
 						$result['url'] = $home['path'].substr($url, 3);
 					}
 				}
@@ -197,6 +240,7 @@ function qtrans_extractURL($url, $host = '', $referer = '') {
 					if(qtrans_isEnabled($match[1])) {
 						// found language information
 						$result['language'] = $match[1];
+						$result['explicit_default_language'] = ($match[1] == $q_config['default_language']);
 						$result['host'] = substr($host, 3);
 					}
 				}
@@ -233,6 +277,8 @@ function qtrans_extractURL($url, $host = '', $referer = '') {
 		}
 	}
 	
+	$result['host_wo_port'] = preg_replace('#:.+$#', '', $result['host']);
+	
 	return $result;
 }
 
@@ -259,9 +305,15 @@ function qtrans_loadConfig() {
 	$url_mode = get_option('mqtranslate_url_mode');
 	$detect_browser_language = get_option('mqtranslate_detect_browser_language');
 	$hide_untranslated = get_option('mqtranslate_hide_untranslated');
+	$show_displayed_language_prefix = get_option('mqtranslate_show_displayed_language_prefix');
 	$auto_update_mo = get_option('mqtranslate_auto_update_mo');
 	$term_name = get_option('mqtranslate_term_name');
 	$hide_default_language = get_option('mqtranslate_hide_default_language');
+	$allowed_custom_post_types = get_option('mqtranslate_allowed_custom_post_types');
+	$disable_header_css = get_option('mqtranslate_disable_header_css');
+	$disable_client_cookies = get_option('mqtranslate_disable_client_cookies');
+	$use_secure_cookie = get_option('mqtranslate_use_secure_cookie');
+	$filter_all_options = get_option('mqtranslate_filter_all_options');
 	
 	// default if not set
 	if(!is_array($date_formats)) $date_formats = $q_config['date_format'];
@@ -276,11 +328,25 @@ function qtrans_loadConfig() {
 	if(empty($default_language)) $default_language = $q_config['default_language'];
 	if(empty($use_strftime)) $use_strftime = $q_config['use_strftime'];
 	if(empty($url_mode)) $url_mode = $q_config['url_mode'];
+	if(empty($allowed_custom_post_types))
+	{
+		if (is_array($q_config['allowed_custom_post_types']))
+			$allowed_custom_post_types = $q_config['allowed_custom_post_types'];
+		else
+			$allowed_custom_post_types = array();
+	}
+	else if (!is_array($allowed_custom_post_types))
+		$allowed_custom_post_types = explode(',', $allowed_custom_post_types); 
 	if(!is_string($flag_location) || $flag_location==='') $flag_location = $q_config['flag_location'];
 	$detect_browser_language = qtrans_validateBool($detect_browser_language, $q_config['detect_browser_language']);
 	$hide_untranslated = qtrans_validateBool($hide_untranslated, $q_config['hide_untranslated']);
+	$show_displayed_language_prefix = qtrans_validateBool($show_displayed_language_prefix, $q_config['show_displayed_language_prefix']);
 	$auto_update_mo = qtrans_validateBool($auto_update_mo, $q_config['auto_update_mo']);
 	$hide_default_language = qtrans_validateBool($hide_default_language, $q_config['hide_default_language']);
+	$disable_header_css = qtrans_validateBool($disable_header_css, $q_config['disable_header_css']);
+	$disable_client_cookies = qtrans_validateBool($disable_client_cookies, $q_config['disable_client_cookies']);
+	$use_secure_cookie = qtrans_validateBool($use_secure_cookie, $q_config['use_secure_cookie']);
+	$filter_all_options = qtrans_validateBool($filter_all_options, $q_config['filter_all_options']);
 	
 	// url fix for upgrading users
 	$flag_location = trailingslashit(preg_replace('#^wp-content/#','',$flag_location));
@@ -294,7 +360,7 @@ function qtrans_loadConfig() {
 	$q_config['time_format'] = $time_formats;
 	$q_config['not_available'] = $na_messages;
 	$q_config['locale'] = $locales;
-	$q_config['flag'] = $flags;
+	$q_config['flag'] = array_merge($q_config['flag'], $flags);
 	$q_config['language_name'] = $language_names;
 	$q_config['enabled_languages'] = $enabled_languages;
 	$q_config['default_language'] = $default_language;
@@ -306,7 +372,13 @@ function qtrans_loadConfig() {
 	$q_config['hide_untranslated'] = $hide_untranslated;
 	$q_config['auto_update_mo'] = $auto_update_mo;
 	$q_config['hide_default_language'] = $hide_default_language;
+	$q_config['show_displayed_language_prefix'] = $show_displayed_language_prefix;
 	$q_config['term_name'] = $term_name;
+	$q_config['allowed_custom_post_types'] = $allowed_custom_post_types;
+	$q_config['disable_header_css'] = $disable_header_css;
+	$q_config['disable_client_cookies'] = $disable_client_cookies;
+	$q_config['use_secure_cookie'] = $use_secure_cookie;
+	$q_config['filter_all_options'] = $filter_all_options;
 	
 	do_action('mqtranslate_loadConfig');
 }
@@ -337,6 +409,10 @@ function qtrans_saveConfig() {
 		update_option('mqtranslate_hide_untranslated', '1');
 	else
 		update_option('mqtranslate_hide_untranslated', '0');
+	if ($q_config['show_displayed_language_prefix'])
+		update_option('mqtranslate_show_displayed_language_prefix', '1');
+	else
+		update_option('mqtranslate_show_displayed_language_prefix', '0');
 	if($q_config['auto_update_mo'])
 		update_option('mqtranslate_auto_update_mo', '1');
 	else
@@ -345,16 +421,30 @@ function qtrans_saveConfig() {
 		update_option('mqtranslate_hide_default_language', '1');
 	else
 		update_option('mqtranslate_hide_default_language', '0');
+	
+	update_option('mqtranslate_allowed_custom_post_types', implode(',', $q_config['allowed_custom_post_types']));
+	update_option('mqtranslate_disable_header_css', $q_config['disable_header_css'] ? '1' : '0');
+	update_option('mqtranslate_disable_client_cookies', $q_config['disable_client_cookies'] ? '1' : '0');
+	update_option('mqtranslate_use_secure_cookie', $q_config['use_secure_cookie'] ? '1' : '0');
+	update_option('mqtranslate_filter_all_options', $q_config['filter_all_options'] ? '1' : '0');
 		
 	do_action('mqtranslate_saveConfig');
 }
 
 function qtrans_updateGettextDatabases($force = false, $only_for_language = '') {
-	global $q_config;
+	global $q_config, $wp_version;
 	if(!is_dir(WP_LANG_DIR)) {
 		if(!@mkdir(WP_LANG_DIR))
 			return false;
 	}
+	
+	// Building major WP version
+	$patterns = array('/(_|\-|\+)/', '/(\D+)/', '/\.{2,}/');
+	$replacements = array('.', '.$1', '.');
+	$wp = preg_replace($patterns, $replacements, $wp_version);
+	$wp = array_slice(explode('.', $wp), 0, 2);
+	$major_wp_version = implode('.', $wp);
+	
 	$next_update = get_option('mqtranslate_next_update_mo');
 	if(time() < $next_update && !$force) return true;
 	update_option('mqtranslate_next_update_mo', time() + 7*24*60*60);
@@ -366,12 +456,18 @@ function qtrans_updateGettextDatabases($force = false, $only_for_language = '') 
 			fclose($ll);
 			// try to find a .mo file
 			if(!($locale == 'en_US' && $lcr = @fopen('http://www.qianqin.de/wp-content/languages/'.$locale.'.mo','r')))
-			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.$locale.'/tags/'.$GLOBALS['wp_version'].'/messages/'.$locale.'.mo','r'))
-			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.substr($locale,0,2).'/tags/'.$GLOBALS['wp_version'].'/messages/'.$locale.'.mo','r'))
-			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.$locale.'/branches/'.$GLOBALS['wp_version'].'/messages/'.$locale.'.mo','r'))
-			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.substr($locale,0,2).'/branches/'.$GLOBALS['wp_version'].'/messages/'.$locale.'.mo','r'))
-			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.$locale.'/branches/'.$GLOBALS['wp_version'].'/'.$locale.'.mo','r'))
-			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.substr($locale,0,2).'/branches/'.$GLOBALS['wp_version'].'/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.$locale.'/tags/'.$wp_version.'/messages/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.$locale.'/tags/'.$major_wp_version.'/messages/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.substr($locale,0,2).'/tags/'.$wp_version.'/messages/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.substr($locale,0,2).'/tags/'.$major_wp_version.'/messages/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.$locale.'/branches/'.$wp_version.'/messages/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.$locale.'/branches/'.$major_wp_version.'/messages/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.substr($locale,0,2).'/branches/'.$wp_version.'/messages/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.substr($locale,0,2).'/branches/'.$major_wp_version.'/messages/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.$locale.'/branches/'.$wp_version.'/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.$locale.'/branches/'.$major_wp_version.'/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.substr($locale,0,2).'/branches/'.$wp_version.'/'.$locale.'.mo','r'))
+			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.substr($locale,0,2).'/branches/'.$major_wp_version.'/'.$locale.'.mo','r'))
 			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.$locale.'/trunk/messages/'.$locale.'.mo','r')) 
 			if(!$lcr = @fopen('http://svn.automattic.com/wordpress-i18n/'.substr($locale,0,2).'/trunk/messages/'.$locale.'.mo','r')) {
 				// couldn't find a .mo file
@@ -458,76 +554,84 @@ function qtrans_strftime($format, $date, $default = '', $before = '', $after = '
 	$search[] = '/(([^%])%Q|^%Q)/'; $replace[] = '${2}'.date('e',$date); // date e
 	$search[] = '/(([^%])%o|^%o)/'; $replace[] = '${2}'.date('I',$date); // date I
 	$search[] = '/(([^%])%O|^%O)/'; $replace[] = '${2}'.date('O',$date); // date O
-	$search[] = '/(([^%])%s|^%s)/'; $replace[] = '${2}'.date('P',$date); // date P
 	$search[] = '/(([^%])%v|^%v)/'; $replace[] = '${2}'.date('T',$date); // date T
 	$search[] = '/(([^%])%1|^%1)/'; $replace[] = '${2}'.date('Z',$date); // date Z
 	$search[] = '/(([^%])%2|^%2)/'; $replace[] = '${2}'.date('c',$date); // date c
 	$search[] = '/(([^%])%3|^%3)/'; $replace[] = '${2}'.date('r',$date); // date r
-	$search[] = '/(([^%])%4|^%4)/'; $replace[] = '${2}'.$date; // date U
+	$search[] = '/(([^%])%4|^%4)/'; $replace[] = '${2}'.date('P',$date); // date P
 	$format = preg_replace($search,$replace,$format);
 	return $before.strftime($format, $date).$after;
 }
 
 function qtrans_dateFromPostForCurrentLanguage($old_date, $format ='', $before = '', $after = '') {
 	global $post, $q_config;
-	
-	$format = qtrans_split($format);
-	$format = $format[$q_config['language']];
+	$ts = mysql2date('U', $post->post_date);
+	if ($format == 'U')
+		return $ts;
+	$format = qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage($format);
 	if (!empty($format) && $q_config['use_strftime'] == QT_STRFTIME)
 		$format = qtrans_convertDateFormatToStrftimeFormat($format);
-	return qtrans_strftime(qtrans_convertDateFormat($format), mysql2date('U',$post->post_date), $old_date, $before, $after);
+	return qtrans_strftime(qtrans_convertDateFormat($format), $ts, $old_date, $before, $after);
 }
 
 function qtrans_dateModifiedFromPostForCurrentLanguage($old_date, $format ='') {
 	global $post, $q_config;
-	$format = qtrans_split($format);
-	$format = $format[$q_config['language']];
+	$ts = mysql2date('U', $post->post_modified);
+	if ($format == 'U')
+		return $ts;
+	$format = qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage($format);
 	if (!empty($format) && $q_config['use_strftime'] == QT_STRFTIME)
 		$format = qtrans_convertDateFormatToStrftimeFormat($format);
-	return qtrans_strftime(qtrans_convertDateFormat($format), mysql2date('U',$post->post_modified), $old_date);
+	return qtrans_strftime(qtrans_convertDateFormat($format), $ts, $old_date);
 }
 
 function qtrans_timeFromPostForCurrentLanguage($old_date, $format = '', $post = null, $gmt = false) {
 	global $q_config;
-	
 	$post = get_post($post);
-	
 	$post_date = $gmt? $post->post_date_gmt : $post->post_date;
-	$format = qtrans_split($format);
-	$format = $format[$q_config['language']];
+	$ts = mysql2date('U',$post_date);
+	if ($format == 'U')
+		return $ts;
+	$format = qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage($format);
 	if (!empty($format) && $q_config['use_strftime'] == QT_STRFTIME)
 		$format = qtrans_convertDateFormatToStrftimeFormat($format);
-	return qtrans_strftime(qtrans_convertTimeFormat($format), mysql2date('U',$post_date), $old_date);
+	return qtrans_strftime(qtrans_convertTimeFormat($format), $ts, $old_date);
 }
 
 function qtrans_timeModifiedFromPostForCurrentLanguage($old_date, $format = '', $gmt = false) {
 	global $post, $q_config;
-	$post_date = $gmt? $post->post_modified_gmt : $post->post_modified;
-	$format = qtrans_split($format);
-	$format = $format[$q_config['language']];
+	$post_date = $gmt ? $post->post_modified_gmt : $post->post_modified;
+	$ts = mysql2date('U',$post_date);
+	if ($format == 'U')
+		return $ts;
+	$format = qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage($format);
 	if (!empty($format) && $q_config['use_strftime'] == QT_STRFTIME)
 		$format = qtrans_convertDateFormatToStrftimeFormat($format);
-	return qtrans_strftime(qtrans_convertTimeFormat($format), mysql2date('U',$post_date), $old_date);
+	return qtrans_strftime(qtrans_convertTimeFormat($format), $ts, $old_date);
 }
 
 function qtrans_dateFromCommentForCurrentLanguage($old_date, $format ='') {
 	global $comment, $q_config;
-	$format = qtrans_split($format);
-	$format = $format[$q_config['language']];
+	$ts = mysql2date('U',$comment->comment_date);
+	if ($format == 'U')
+		return $ts;
+	$format = qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage($format);
 	if (!empty($format) && $q_config['use_strftime'] == QT_STRFTIME)
 		$format = qtrans_convertDateFormatToStrftimeFormat($format);
-	return qtrans_strftime(qtrans_convertDateFormat($format), mysql2date('U',$comment->comment_date), $old_date);
+	return qtrans_strftime(qtrans_convertDateFormat($format), $ts, $old_date);
 }
 
 function qtrans_timeFromCommentForCurrentLanguage($old_date, $format = '', $gmt = false, $translate = true) {
 	if(!$translate) return $old_date;
 	global $comment, $q_config;
 	$comment_date = $gmt? $comment->comment_date_gmt : $comment->comment_date;
-	$format = qtrans_split($format);
-	$format = $format[$q_config['language']];
+	$ts = mysql2date('U',$comment_date);
+	if ($format == 'U')
+		return $ts;
+	$format = qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage($format);
 	if (!empty($format) && $q_config['use_strftime'] == QT_STRFTIME)
 		$format = qtrans_convertDateFormatToStrftimeFormat($format);
-	return qtrans_strftime(qtrans_convertTimeFormat($format), mysql2date('U',$comment_date), $old_date);
+	return qtrans_strftime(qtrans_convertTimeFormat($format), $ts, $old_date);
 }
 
 /* END DATE TIME FUNCTIONS */
@@ -560,7 +664,7 @@ function qtrans_convertBlogInfoURL($url, $what) {
 	return qtrans_convertURL($url);
 }
 
-function qtrans_convertURL($url='', $lang='', $forceadmin = false) {
+function qtrans_convertURL($url='', $lang='', $forceadmin = false, $forceaddlang = false) {
 	global $q_config;
 	
 	// invalid language
@@ -578,7 +682,7 @@ function qtrans_convertURL($url='', $lang='', $forceadmin = false) {
 	
 	// check if it's an external link
 	$urlinfo = qtrans_parseURL($url);
-	$home = rtrim(get_option('home'),"/");
+	$home = rtrim(qtrans_getHome(),"/");
 	if($urlinfo['host']!='') {
 		// check for already existing pre-domain language information
 		if($q_config['url_mode'] == QT_URL_DOMAIN && preg_match("#^([a-z]{2}).#i",$urlinfo['host'],$match)) {
@@ -605,9 +709,8 @@ function qtrans_convertURL($url='', $lang='', $forceadmin = false) {
 	}
 	
 	// check for query language information and remove if found
-	if(preg_match("#(&|\?)lang=([^&\#]+)#i",$url,$match) && qtrans_isEnabled($match[2])) {
+	if (preg_match("#(&|\?)lang=([^&\#]+)#i",$url,$match) && qtrans_isEnabled($match[2]))
 		$url = preg_replace("#(&|\?)lang=".$match[2]."&?#i","$1",$url);
-	}
 	
 	// remove any slashes out front
 	$url = ltrim($url,"/");
@@ -629,36 +732,47 @@ function qtrans_convertURL($url='', $lang='', $forceadmin = false) {
 	if(preg_match("#^(wp-login.php|wp-signup.php|wp-register.php|wp-admin/)#", $url)) {
 		return $home."/".$url;
 	}
-
+	
 	switch($q_config['url_mode']) {
 		case QT_URL_PATH:	// pre url
 			// might already have language information
-			if(preg_match("#^([a-z]{2})/#i",$url,$match)) {
-				if(qtrans_isEnabled($match[1])) {
+			if(preg_match("#^([a-z]{2})/#i",$url,$_match)) {
+				if(qtrans_isEnabled($_match[1])) {
 					// found language information, remove it
 					$url = substr($url, 3);
 				}
 			}
-			if(!$q_config['hide_default_language']||$lang!=$q_config['default_language']) $url = $lang."/".$url;
+			if(!$q_config['hide_default_language']||$lang!=$q_config['default_language']||$forceaddlang)
+				$url = $lang."/".$url;
 			break;
-		case QT_URL_DOMAIN:	// pre domain 
-			if(!$q_config['hide_default_language']||$lang!=$q_config['default_language']) $home = preg_replace("#//#","//".$lang.".",$home,1);
+		case QT_URL_DOMAIN:	// pre domain
+			// might already have language information
+			if (preg_match('#//([a-z]{2})\.#i', $url, $_match)) {
+				if (qtrans_isEnabled($_match[1]))
+					$url = preg_replace("#//{$_match[1]}\.#i", '//', $url);
+			} 
+			if (!$q_config['hide_default_language']||$lang!=$q_config['default_language']||$forceaddlang)
+				$home = preg_replace("#//#","//{$lang}.",$home,1);
 			break;
 		default: // query
-			if(!$q_config['hide_default_language']||$lang!=$q_config['default_language']){
-				if(strpos($url,'?')===false) {
+			// might already have language information
+			if (preg_match('#(&|\?)lang=([a-zA-Z]{2})&?#', $url, $_match)) {
+				if (qtrans_isEnabled($_match[1]))
+					$url = preg_replace("#(&|/?)lang={$_match[1]}&?#", "$1", $url);
+			}
+			if(!$q_config['hide_default_language']||$lang!=$q_config['default_language']||$forceaddlang){
+				if (strpos($url,'?') === false)
 					$url .= '?';
-				} else {
+				else
 					$url .= '&';
-				}
 				$url .= "lang=".$lang;
 			}
 	}
 	
 	// see if cookies are activated
-	if(!$q_config['cookie_enabled'] && !$q_config['url_info']['internal_referer'] && $urlinfo['path'] == '' && $lang == $q_config['default_language'] && $q_config['language'] != $q_config['default_language'] && $q_config['hide_default_language']) {
+	if(!$q_config['cookie_enabled'] && !$q_config['url_info']['internal_referer'] && $urlinfo['path'] == '' && $lang == $q_config['default_language'] && $q_config['language'] != $q_config['default_language'] && $q_config['hide_default_language'] && !empty($match[2])) {
 		// :( now we have to make unpretty URLs
-		$url = preg_replace("#(&|\?)lang=".$match[2]."&?#i","$1",$url);
+		$url = preg_replace("#(&|\?)lang=[^&]+&?#i","$1",$url);
 		if(strpos($url,'?')===false) {
 			$url .= '?';
 		} else {
@@ -669,7 +783,7 @@ function qtrans_convertURL($url='', $lang='', $forceadmin = false) {
 	
 	// &amp; workaround
 	$complete = str_replace('&','&amp;',$home."/".$url);
-
+	
 	// remove trailing slash if there wasn't one to begin with
 	if($nottrailing && strpos($complete,'?')===false && strpos($complete,'#')===false && substr($complete,-1,1)=='/')
 		$complete = substr($complete,0,-1);
@@ -678,68 +792,68 @@ function qtrans_convertURL($url='', $lang='', $forceadmin = false) {
 }
 
 // splits text with language tags into array
-function qtrans_split($text, $quicktags = true) {
+function qtrans_split($text, $quicktags = true, array &$languageMap = NULL) {
 	global $q_config;
 	
 	//init vars
 	$split_regex = "#(<!--[^-]*-->|\[:[a-z]{2}\])#ism";
 	$current_language = "";
 	$result = array();
-	foreach($q_config['enabled_languages'] as $language) {
+	foreach($q_config['enabled_languages'] as $language)
 		$result[$language] = "";
-	}
 	
 	// split text at all xml comments
 	$blocks = preg_split($split_regex, $text, -1, PREG_SPLIT_NO_EMPTY|PREG_SPLIT_DELIM_CAPTURE);
-	foreach($blocks as $block) {
+	foreach ($blocks as $block) {
 		# detect language tags
-		if(preg_match("#^<!--:([a-z]{2})-->$#ism", $block, $matches)) {
-			if(qtrans_isEnabled($matches[1])) {
+		if (preg_match("#^<!--:([a-z]{2})-->$#ismS", $block, $matches)) {
+			if (qtrans_isEnabled($matches[1])) {
 				$current_language = $matches[1];
-			} else {
+				$languageMap[$current_language] = false;
+			} else
 				$current_language = "invalid";
-			}
 			continue;
 		// detect quicktags
-		} elseif($quicktags && preg_match("#^\[:([a-z]{2})\]$#ism", $block, $matches)) {
-			if(qtrans_isEnabled($matches[1])) {
+		} elseif ($quicktags && preg_match("#^\[:([a-z]{2})\]$#ismS", $block, $matches)) {
+			if (qtrans_isEnabled($matches[1])) {
 				$current_language = $matches[1];
-			} else {
-				$current_language = "invalid";
+				$languageMap[$current_language] = true;
 			}
+			else
+				$current_language = "invalid";
 			continue;
 		// detect ending tags
-		} elseif(preg_match("#^<!--:-->$#ism", $block, $matches)) {
+		} elseif ($block == '<!--:-->') {
 			$current_language = "";
 			continue;
 		// detect defective more tag
-		} elseif(preg_match("#^<!--more-->$#ism", $block, $matches)) {
-			foreach($q_config['enabled_languages'] as $language) {
+		} elseif ($block == '<!--more-->') {
+			foreach ($q_config['enabled_languages'] as $language)
 				$result[$language] .= $block;
-			}
 			continue;
 		}
+		
 		// correctly categorize text block
-		if($current_language == "") {
+		if ($current_language == "") {
 			// general block, add to all languages
-			foreach($q_config['enabled_languages'] as $language) {
+			foreach ($q_config['enabled_languages'] as $language)
 				$result[$language] .= $block;
-			}
 		} elseif($current_language != "invalid") {
 			// specific block, only add to active language
 			$result[$current_language] .= $block;
 		}
 	}
-	foreach($result as $lang => $lang_content) {
-		$result[$lang] = preg_replace("#(<!--more-->|<!--nextpage-->)+$#ism","",$lang_content);
-	}
+	
+	foreach ($result as $lang => $lang_content)
+		$result[$lang] = preg_replace("#(<!--more-->|<!--nextpage-->)+$#ismS","",$lang_content);
+	
 	return $result;
 }
 
-function qtrans_join($texts) {
+function qtrans_join($texts, array $tagTypeMap = array()) {
 	global $q_config;
 	if(!is_array($texts)) $texts = qtrans_split($texts, false);
-	$split_regex = "#<!--more-->#ism";
+	$split_regex = "#<!--more-->#ismS";
 	$max = 0;
 	$text = "";
 	
@@ -755,8 +869,11 @@ function qtrans_join($texts) {
 			$text .= '<!--more-->';
 		}
 		foreach($q_config['enabled_languages'] as $language) {
-			if(isset($texts[$language][$i]) && $texts[$language][$i] !== '') {
-				$text .= '<!--:'.$language.'-->'.$texts[$language][$i].'<!--:-->';
+			if (isset($texts[$language][$i]) && $texts[$language][$i] !== '') {
+				if (empty($tagTypeMap[$language]))
+					$text .= '<!--:'.$language.'-->'.$texts[$language][$i].'<!--:-->';
+				else
+					$text .= "[:{$language}]{$texts[$language][$i]}";
 			}
 		}
 	}
@@ -791,71 +908,83 @@ function qtrans_enableLanguage($lang) {
 
 function qtrans_use($lang, $text, $show_available=false) {
 	global $q_config;
+	
 	// return full string if language is not enabled
-	if(!qtrans_isEnabled($lang)) return $text;
-	if(is_array($text)) {
+	if (!qtrans_isEnabled($lang) || (is_string($text) && !preg_match('/(<!--:[a-z]{2}-->|\[:[a-z]{2}\])/', $text))) 
+		return $text;
+	
+	if (is_array($text)) {
 		// handle arrays recursively
-		foreach($text as $key => $t) {
-			$text[$key] = qtrans_use($lang,$text[$key],$show_available);
-		}
+		foreach ($text as &$t)
+			$t = qtrans_use($lang, $t, $show_available);
 		return $text;
 	}
 	
-	if(is_object($text)||@get_class($text) == '__PHP_Incomplete_Class') {
-		foreach(get_object_vars($text) as $key => $t) {
-			$text->$key = qtrans_use($lang,$text->$key,$show_available);
-		}
+	if (is_object($text) || $text instanceof __PHP_Incomplete_Class) {
+		foreach ($text as &$t)
+			$t = qtrans_use($lang, $t, $show_available);
 		return $text;
 	}
 	
 	// prevent filtering weird data types and save some resources
-	if(!is_string($text) || $text == '') {
+	if (!is_string($text) || $text == '')
 		return $text;
-	}
 	
 	// get content
 	$content = qtrans_split($text);
 	// find available languages
 	$available_languages = array();
-	foreach($content as $language => $lang_text) {
+	foreach ($content as $language => &$lang_text) {
 		$lang_text = trim($lang_text);
-		if(!empty($lang_text)) $available_languages[] = $language;
+		if (!empty($lang_text))
+			$available_languages[] = $language;
 	}
+	unset($lang_text);
 	
 	// if no languages available show full text
-	if(sizeof($available_languages)==0) return $text;
+	if (empty($available_languages))
+		return $text;
+	
 	// if content is available show the content in the requested language
-	if(!empty($content[$lang])) {
+	if (!empty($content[$lang]))
 		return $content[$lang];
-	}
+	
 	// content not available in requested language (bad!!) what now?
-	if(!$show_available){
+	if (!$show_available) { 
 		// check if content is available in default language, if not return first language found. (prevent empty result)
-		if($lang!=$q_config['default_language'])
-			return "(".$q_config['language_name'][$q_config['default_language']].") ".qtrans_use($q_config['default_language'], $text, $show_available);
-		foreach($content as $language => $lang_text) {
-			$lang_text = trim($lang_text);
-			if(!empty($lang_text)) {
-				return "(".$q_config['language_name'][$language].") ".$lang_text;
+		if ($lang != $q_config['default_language'] && !empty($content[$q_config['default_language']])) {
+			$str = $content[$q_config['default_language']];
+			if ($q_config['show_displayed_language_prefix'])
+				$str = "(".$q_config['language_name'][$q_config['default_language']].") " . $str;
+			return $str;
+		}
+		
+		foreach ($content as $language => $lang_text) {
+			if (!empty($lang_text)) {
+				$str = $lang_text;
+				if ($q_config['show_displayed_language_prefix'])
+					$str = "(".$q_config['language_name'][$language].") " . $str;
+				return $str;
 			}
 		}
 	}
+	
 	// display selection for available languages
 	$available_languages = array_unique($available_languages);
 	$language_list = "";
-	if(preg_match('/%LANG:([^:]*):([^%]*)%/',$q_config['not_available'][$lang],$match)) {
+	if (preg_match('/%LANG:([^:]*):([^%]*)%/S', $q_config['not_available'][$lang], $match)) {
 		$normal_seperator = $match[1];
 		$end_seperator = $match[2];
 		// build available languages string backward
-		$i = 0;
-		foreach($available_languages as $language) {
-			if($i==1) $language_list  = $end_seperator.$language_list;
-			if($i>1) $language_list  = $normal_seperator.$language_list;
+		foreach ($available_languages as $k => $language) {
+			if ($k == 1)
+				$language_list = $end_seperator.$language_list;
+			else if ($k > 1)
+				$language_list = $normal_seperator.$language_list;
 			$language_list = "<a href=\"".qtrans_convertURL('', $language)."\">".$q_config['language_name'][$language]."</a>".$language_list;
-			$i++;
 		}
 	}
-	return "<p>".preg_replace('/%LANG:([^:]*):([^%]*)%/', $language_list, $q_config['not_available'][$lang])."</p>";
+	return "<p>".preg_replace('/%LANG:([^:]*):([^%]*)%/S', $language_list, $q_config['not_available'][$lang])."</p>";
 }
 
 function qtrans_showAllSeperated($text) {

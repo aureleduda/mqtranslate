@@ -20,27 +20,24 @@
 /* mqTranslate Utilitys */
 
 function qtrans_parseURL($url) {
-    $r  = '!(?:(\w+)://)?(?:(\w+)\:(\w+)@)?([^/:]+)?';
-    $r .= '(?:\:(\d*))?([^#?]+)?(?:\?([^#]+))?(?:#(.+$))?!i';
-
-    preg_match ( $r, $url, $out );
-    $result = @array(
-        "scheme" => $out[1],
-        "host" => $out[4].(($out[5]=='')?'':':'.$out[5]),
-        "user" => $out[2],
-        "pass" => $out[3],
-        "path" => $out[6],
-        "query" => $out[7],
-        "fragment" => $out[8]
-        );
-    return $result;
+	$r  = '!(?:(\w+)://)?(?:(\w+)\:(\w+)@)?([^/:]+)?';
+	$r .= '(?:\:(\d*))?([^#?]+)?(?:\?([^#]+))?(?:#(.+$))?!i';
+	
+	preg_match ( $r, $url, $out );
+	$result = @array(
+			"scheme" => $out[1],
+			"host" => $out[4].(($out[5]=='')?'':':'.$out[5]),
+			"user" => $out[2],
+			"pass" => $out[3],
+			"path" => $out[6],
+			"query" => $out[7],
+			"fragment" => $out[8]
+	);
+	return $result;
 }
 
 function qtrans_stripSlashesIfNecessary($str) {
-	if(1==get_magic_quotes_gpc()) {
-		$str = stripslashes($str);
-	}
-	return $str;
+	return get_magic_quotes_gpc() ? stripslashes($str) : $str;
 }
 
 function qtrans_insertDropDownElement($language, $url, $id){
@@ -138,12 +135,12 @@ function qtrans_convertDateFormatToStrftimeFormat($format) {
 		'e' => '%Q',
 		'I' => '%o',
 		'O' => '%O',
-		'P' => '%s',
+		'U' => '%s',
 		'T' => '%v',
 		'Z' => '%1',
 		'c' => '%2',
 		'r' => '%3',
-		'U' => '%4'
+		'P' => '%4'
 	);
 	
 	$date_parameters = array();

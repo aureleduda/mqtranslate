@@ -32,15 +32,18 @@ function mqtrans_export_setting_to_qtrans($updateOnly = false) {
 }
 
 function mqtrans_currentUserCanEdit($lang) {
+	global $q_config;
+	
 	$cu = wp_get_current_user();
-	if ($cu->has_cap('edit_users'))
+	if ($cu->has_cap('edit_users') || empty($q_config['ul_lang_protection']))
 		return true;
 	else
 	{
-		$user_langs = get_user_meta($cu->ID, 'mqtranslate_language_access', true);
-		if (empty($user_langs))
-			return false;
-		$user_langs = explode(',', $user_langs);
+		$user_meta = get_user_meta($cu->ID);
+		if (empty($user_meta) || !is_array($user_meta) || !array_key_exists('mqtranslate_language_access', $user_meta))
+			$user_langs = $q_config['enabled_languages'];
+		else
+			$user_langs = explode(',', get_user_meta($cu->ID, 'mqtranslate_language_access', true));
 		return in_array($lang, $user_langs);
 	}
 }
@@ -49,7 +52,7 @@ function mqtrans_currentUserCanView($lang) {
 	global $q_config;
 	
 	$cu = wp_get_current_user();
-	if ($cu->has_cap('edit_users'))
+	if ($cu->has_cap('edit_users') || empty($q_config['ul_lang_protection']))
 		return true;
 	else
 	{
@@ -57,13 +60,16 @@ function mqtrans_currentUserCanView($lang) {
 		if (empty($master_lang))
 			return ($lang === $q_config['default_language']);
 		else
-			return ($lang === $master_lang || $lang === $q_config['default_language']);
+			return ($lang === $master_lang || $lang === $q_config['default_language']);	
 	}
 }
 
 function mqtrans_userProfile($user) {
 	global $q_config;
 
+	if (empty($q_config['ul_lang_protection']))
+		return;
+	
 	$cu = wp_get_current_user();
 	$langs = qtrans_getSortedLanguages();
 	
@@ -71,11 +77,11 @@ function mqtrans_userProfile($user) {
 	echo "<table class=\"form-table\">\n<tbody>\n";
 	
 	// Editable languages
-	$user_langs = get_user_meta($user->ID, 'mqtranslate_language_access', true);
-	if (empty($user_langs))
-		$user_langs = array();
+	$user_meta = get_user_meta($user->ID);
+	if (empty($user_meta) || !is_array($user_meta) || !array_key_exists('mqtranslate_language_access', $user_meta))
+		$user_langs = $q_config['enabled_languages'];
 	else
-		$user_langs = explode(',', $user_langs);
+		$user_langs = explode(',', get_user_meta($user->ID, 'mqtranslate_language_access', true));
 	echo "<tr>\n";
 	if ($cu->ID == $user->ID)
 		echo '<th>'.__('You can edit posts in', 'mqtranslate') . "</th>\n";
@@ -157,16 +163,14 @@ function mqtrans_userProfile($user) {
 }
 
 function mqtrans_userProfileUpdate($user_id) {
+	global $q_config;
 	$cu = wp_get_current_user();
-	if ($cu->has_cap('edit_users')) {
+	if ($cu->has_cap('edit_users') && !empty($q_config['ul_lang_protection'])) {
 		// Editable languages
 		$langs = (empty($_POST['mqtrans_user_lang'])) ? array() : $_POST['mqtrans_user_lang'];
 		if (!is_array($langs))
 			$langs = array();
-		if (empty($langs))
-			delete_user_meta($user_id, 'mqtranslate_language_access');
-		else
-			update_user_meta($user_id, 'mqtranslate_language_access', implode(',', $langs));
+		update_user_meta($user_id, 'mqtranslate_language_access', implode(',', $langs));
 		
 		// Master language
 		if (empty($_POST['mqtrans_master_lang']))
@@ -182,14 +186,24 @@ function qtrans_isEmptyContent($value) {
 }
 
 function mqtrans_postUpdated($post_ID, $after, $before) {
-	global $wpdb;
+	global $wpdb, $q_config;
 
+	// Don't handle custom post types
+	if (!in_array($after->post_type, array( 'post', 'page' )) && !in_array($after->post_type, $q_config['allowed_custom_post_types']))
+		return;
+	
+	$titleMap = array();
+	$contentMap = array();
+	
 	$cu = wp_get_current_user();
-	if ($cu->has_cap('edit_users'))
+	if ($cu->has_cap('edit_users') || empty($q_config['ul_lang_protection']))
 	{
-		$title = $after->post_title;
-
-		$content = qtrans_split($after->post_content);
+		$title = qtrans_split($after->post_title, true, $titleMap);
+		foreach ($title as $k => $v) {
+			if (qtrans_isEmptyContent($v))
+				unset($title[$k]);
+		}
+		$content = qtrans_split($after->post_content, true, $contentMap);
 		foreach ($content as $k => $v) {
 			if (qtrans_isEmptyContent($v))
 				unset($content[$k]);
@@ -197,33 +211,38 @@ function mqtrans_postUpdated($post_ID, $after, $before) {
 	}
 	else
 	{
-		$titleBefore = qtrans_split($before->post_title);
-		$titleAfter = qtrans_split($after->post_title);
+		$titleBeforeMap = array();
+		$titleBefore = qtrans_split($before->post_title, true, $titleBeforeMap);
+		$titleAfter = qtrans_split($after->post_title, true, $titleMap);
 		foreach ($titleAfter as $k => $v) {
 			if (!mqtrans_currentUserCanEdit($k))
-				unset($titleAfter[$k]);
+				unset($titleAfter[$k], $titleMap[$k]);
 		}
 		$title = array_merge($titleBefore, $titleAfter);
+		$titleMap = array_merge($titleBeforeMap, $titleMap);
 
-		$contentBefore = qtrans_split($before->post_content);
-		$contentAfter = qtrans_split($after->post_content);
+		$contentBeforeMap = array();
+		$contentBefore = qtrans_split($before->post_content, true, $contentBeforeMap);
+		$contentAfter = qtrans_split($after->post_content, true, $contentMap);
 		foreach ($contentAfter as $k => $v) {
 			if (qtrans_isEmptyContent($v) || !mqtrans_currentUserCanEdit($k))
-				unset($contentAfter[$k]);
+				unset($contentAfter[$k], $contentMap[$k]);
 		}
 		$content = array_merge($contentBefore, $contentAfter);
+		$contentMap = array_merge($contentBeforeMap, $contentMap);
 	}
 	
-	$data = array('post_title' => qtrans_join($title), 'post_content' => qtrans_join($content));
-	$data = stripslashes_deep($data);
+	$data = array('post_title' => qtrans_join($title, $titleMap), 'post_content' => qtrans_join($content, $contentMap));
+	if (get_magic_quotes_gpc())
+		$data = stripslashes_deep($data);
 	$where = array('ID' => $post_ID);
-		
+	
 	$wpdb->update($wpdb->posts, $data, $where);
 }
 
 function mqtrans_filterHomeURL($url, $path, $orig_scheme, $blog_id) {
 	global $q_config;
-	return ((empty($path) && $q_config['url_mode'] == QT_URL_PATH) || $path == '/') ? qtrans_convertURL($url) : $url;
+	return ((empty($path) && $q_config['url_mode'] == QT_URL_PATH) || $path == '/' || !empty($q_config['url_info']['explicit_default_language'])) ? qtrans_convertURL($url, '', false, $q_config['url_info']['explicit_default_language']) : $url;
 }
 
 function mqtrans_filterPostMetaData($original_value, $object_id, $meta_key, $single) {
@@ -254,14 +273,66 @@ function mqtrans_filterPostMetaData($original_value, $object_id, $meta_key, $sin
 	return null;
 }
 
+function mqtrans_team_options() {
+	global $q_config;
+?>
+	<h3><?php _e('mqTranslate Team Settings', 'mqtranslate') ?><span id="mqtranslate-show-team"> (<a name="mqtranslate_team_settings" href="#" onclick="return showTeamSettings();"><?php _e('Show / Hide', 'mqtranslate'); ?></a>)</span></h3>
+	<table class="form-table" id="mqtranslate-team" style="display: none">
+			<tr>
+				<th scope="row"><?php _e('User-level Language Protection', 'mqtranslate') ?></th>
+				<td>
+					<label for="ul_lang_protection"><input type="checkbox" name="ul_lang_protection" id="ul_lang_protection" value="1"<?php echo ($q_config['ul_lang_protection'])?' checked="checked"':''; ?>/> <?php _e('Enable user-level language protection', 'mqtranslate'); ?></label>
+					<br />
+					<small><?php _e('When enabled, this option allows you to select which language is editable on a user-level account basis.', 'mqtranslate') ?></small>
+				</td>
+			</tr>
+	</table>
+	<script type="text/javascript">
+	// <![CDATA[
+		function showTeamSettings() {
+			var el = document.getElementById('mqtranslate-team');
+			if (el.style.display == 'block')
+				el.style.display = 'none';
+			else
+				el.style.display='block';
+			return false;
+		}
+	// ]]>
+	</script>
+<?php
+}
+
+function mqtrans_load_team_options() {
+	global $q_config;
+	$opt = get_option('mqtranslate_ul_lang_protection');
+	if ($opt === false)
+		$q_config['ul_lang_protection'] = true;
+	else
+		$q_config['ul_lang_protection'] = ($opt == '1');
+}
+
+function mqtrans_save_team_options() {
+	qtrans_checkSetting('ul_lang_protection', true, QT_BOOLEAN);
+}
+
+function mqtrans_editorExpand() {
+	return false;
+}
+
 if (!defined('WP_ADMIN'))
 {
 	add_filter('home_url', 'mqtrans_filterHomeURL', 10, 4);
 	add_filter('get_post_metadata', 'mqtrans_filterPostMetaData', 10, 4);
 }
+else
+	add_filter('wp_editor_expand', 'mqtrans_editorExpand');
 
 add_action('edit_user_profile', 			'mqtrans_userProfile');
 add_action('show_user_profile',				'mqtrans_userProfile');
 add_action('profile_update',				'mqtrans_userProfileUpdate');
 add_action('post_updated',					'mqtrans_postUpdated', 10, 3);
+
+add_action('mqtranslate_configuration', 	'mqtrans_team_options', 9);
+add_action('mqtranslate_loadConfig',		'mqtrans_load_team_options');
+add_action('mqtranslate_saveConfig',		'mqtrans_save_team_options');
 ?>

@@ -48,10 +48,13 @@ function qtrans_modifyTermFormFor($term) {
 }
 
 function qtrans_TinyMCE_init() {
-	global $q_config;
-	echo "<script type=\"text/javascript\">\n// <![CDATA[\n";
-	echo $q_config['js']['qtrans_updateTinyMCE'];
-	echo "</script>\n";
+	if (user_can_richedit())
+	{
+		global $q_config;
+		echo "<script type=\"text/javascript\">\n// <![CDATA[\n";
+		echo $q_config['js']['qtrans_updateTinyMCE'];
+		echo "</script>\n";
+	}
 }
 
 function isWordPressMajorVersionSupported() {
@@ -92,7 +95,7 @@ function qtrans_modifyRichEditor($old_content) {
 	{
 		if (!defined('QT_DISPLAYED_INCOMPATIBLE_MESSAGE'))
 		{
-			echo '<div class="updated" id="qtrans_imsg">'.__('The mqTranslate Editor has disabled itself because it hasn\'t been tested with your Wordpress version yet. This is done to prevent Wordpress from malfunctioning. To remove this message permanently, please update mqTranslate to the <a href="http://wordpress.org/plugins/mqtranslate/" target="_blank">corresponding version</a>.', 'mqtranslate').'</div>';
+			echo '<div class="error" id="qtrans_imsg"><p>'.__('The mqTranslate Editor has disabled itself because it hasn\'t been tested with your Wordpress version yet. This is done to prevent Wordpress from malfunctioning. To remove this message permanently, please update mqTranslate to the <a href="http://wordpress.org/plugins/mqtranslate/" target="_blank">corresponding version</a>.', 'mqtranslate').'</p></div>';
 			define('QT_DISPLAYED_INCOMPATIBLE_MESSAGE', true);
 		}
 		$init_editor = false;
@@ -107,21 +110,21 @@ function qtrans_modifyRichEditor($old_content) {
 	if($id!="content") return $old_content;
 	
 	// don't do anything to the editor if it's not rich
-	if(!user_can_richedit()) {
+	if (!user_can_richedit()) {
 		//echo '<p class="updated">'.__('The mqTranslate Editor could not be loaded because WYSIWYG/TinyMCE is not activated in your profile.').'</p>';
 		return $old_content;
 	}
 	
-	// remove wpautop
-	if('html' != wp_default_editor()) {
-		remove_filter('the_editor_content', 'wp_richedit_pre');
-	}
-	
- 	$content = "";
+	$content = "";
 	$content_append = "";
 	
 	// create editing field for selected languages
-	$qt_textarea = '<textarea class="wp-editor-area" id="qtrans_textarea_'.$id.'" name="qtrans_textarea_'.$id.'" tabindex="2" cols="'.$cols.'" style="display:none" onblur="qtrans_save(this.value);"></textarea>';
+	$cookie = (int) get_user_setting( 'ed_size' );
+	if ($cookie)
+		$str_height = "height: {$cookie}px; ";
+	else 
+		$str_height = '';
+	$qt_textarea = '<textarea class="wp-editor-area" id="qtrans_textarea_'.$id.'" name="qtrans_textarea_'.$id.'" tabindex="2" cols="'.$cols.'" style="'.$str_height.'display:none" onblur="qtrans_save(this.value);"></textarea>';
 	$old_content = preg_replace('#(<textarea[^>]*>.*</textarea>)#', '$1'.$qt_textarea, $old_content);
 	
 	// do some crazy js to alter the admin view
@@ -171,6 +174,8 @@ function qtrans_modifyRichEditor($old_content) {
 	$content_append .="document.getElementById('qtrans_select_".$q_config['default_language']."').className='wp-switch-editor switch-tmce switch-html';\n";
 	// show default language
 	$content_append .="var text = document.getElementById('".$id."').value;\n";
+	// when TinyMCE is displayed as the default editor, remove the automatically added paragraphs before initializing mqTranslate
+	$content_append .="if(getUserSetting( 'editor' ) == 'tinymce') { var text = switchEditors.pre_wpautop(text); }";
 	$content_append .="qtrans_assign('qtrans_textarea_".$id."',qtrans_use('".$q_config['default_language']."',text));\n";
 	
 	$content_append .="}\n";
@@ -392,7 +397,7 @@ function qtrans_insertTitleInput($language){
 }
 
 function qtrans_createEditorToolbarButton($language, $id, $js_function = 'switchEditors.go', $label = ''){
-	global $q_config;
+	global $q_config, $wp_version;
 	
 	$cu = wp_get_current_user();
 	$editable = ($cu->has_cap('edit_users') || mqtrans_currentUserCanEdit($language));
@@ -401,17 +406,27 @@ function qtrans_createEditorToolbarButton($language, $id, $js_function = 'switch
 	if (!$editable)
 		$title .= ' - ' . __('Read only', 'mqtranslate');
 	
-	$html = "
-		var bc = document.getElementById('wp-".$id."-editor-tools');
-		var mb = document.getElementById('wp-".$id."-media-buttons');
-		var ls = document.createElement('a');
-		var l = document.createTextNode('{$title}');
-		ls.id = 'qtrans_select_".$language."';
-		ls.className = 'wp-switch-editor';
-		ls.onclick = function() { ".$js_function."('".$id."','".$language."'); };
-		ls.appendChild(l);
-		bc.insertBefore(ls,mb);
-		";
+	if (version_compare($wp_version, '4.1-beta', '<'))
+	{
+		$html = "
+			var bc = document.getElementById('wp-".$id."-editor-tools');
+			var mb = document.getElementById('wp-".$id."-media-buttons');
+			var ls = document.createElement('a');
+			var l = document.createTextNode('{$title}');
+			ls.id = 'qtrans_select_".$language."';
+			ls.className = 'wp-switch-editor';
+			ls.onclick = function() { ".$js_function."('".$id."','".$language."'); };
+			ls.appendChild(l);
+			bc.insertBefore(ls,mb);
+			";
+	}
+	else {
+		$html = "
+			var before = jQuery('#{$id}-html');
+			var html = '<button id=\"qtrans_select_{$language}\" class=\"wp-switch-editor\" onclick=\"{$js_function}(\'{$id}\', \'{$language}\');\" type=\"button\">{$title}</button>';
+			jQuery(html).insertAfter(before);
+			";
+	}
 	return $html;
 }
 ?>

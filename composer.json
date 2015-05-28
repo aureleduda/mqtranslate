@@ -1,0 +1,37 @@
+{
+  "name": "fruitware/wp-plugin-mqtranslate",
+  "type": "wordpress-plugin",
+  "license": "MIT",
+  "description" : "Based on qTranslate, adds userfriendly multilingual content management and translation support, with collaborative and team-oriented extensions.",
+  "keywords": [
+    "wordpress",
+    "plugin",
+    "multilingual",
+    "language",
+    "admin",
+    "tinymce",
+    "bilingual",
+    "widget",
+    "switcher",
+    "i18n",
+    "l10n",
+    "multilanguage",
+    "professional",
+    "translation",
+    "service",
+    "human"
+  ],
+  "homepage": "https://wordpress.org/plugins/mqtranslate/",
+  "authors": [
+    {
+      "name": "chsxf"
+    }
+  ],
+  "require": {
+    "php": ">=5.3.3"
+  },
+  "conflict": {
+    "wpackagist/qtranslate": "dev-master",
+    "wpackagist-plugin/qtranslate": "dev-master"
+  }
+}
