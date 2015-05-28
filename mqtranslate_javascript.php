@@ -235,6 +235,7 @@ function qtrans_initJS() {
 		jQuery('.wp-editor-wrap').unbind('mousedown');
 		jQuery('.wp-editor-wrap').mousedown(function(e){
 			wpActiveEditor = 'qtrans_textarea_'+this.id.slice(3, -5);
+			jQuery('#insert-media-button').data('editor', 'qtrans_textarea_' + this.id.slice(3, -5));
 		});
 		";
 	
@@ -303,11 +304,11 @@ function qtrans_initJS() {
 		qtrans_hook_on_tinyMCE = function(id, initEditor) {
 			tinyMCEPreInit.mceInit[id].setup = function(ed) {
 				ed.on('SaveContent', function(e) {
-					if (!ed.isHidden()) {
+					if (!ed.isHidden() && ed.id.match(/^qtrans_/)) {
 						e.content = e.content.replace( /<p>(<br ?\/?>|\u00a0|\uFEFF)?<\/p>/g, '<p>&nbsp;</p>' );
-						if ( ed.getParam( 'wpautop', true ) )
-							e.content = switchEditors.pre_wpautop(e.content);
-						qtrans_save(e.content);
+						if (ed.id.match(/^qtrans_/)) {
+							qtrans_save(switchEditors.pre_wpautop(e.content));
+						}
 					}
 				});
 				ed.on('init', function(e) {

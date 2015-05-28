@@ -41,13 +41,13 @@ function qtrans_header(){
 	foreach($q_config['enabled_languages'] as $language) {
 		if($language != qtrans_getLanguage())
 			echo '<link hreflang="'.$language.'" href="'.qtrans_convertURL('',$language).'" rel="alternate" />'."\n";
-	}
+	}	
 }
 
 function qtrans_localeForCurrentLanguage($locale) {
 	if (!defined('QTRANS_INIT'))
 		return $locale;
-
+	
 	global $q_config;
 	// try to figure out the correct locale
 	$locale = array();
@@ -56,11 +56,11 @@ function qtrans_localeForCurrentLanguage($locale) {
 	$locale[] = $q_config['locale'][$q_config['language']];
 	$locale[] = $q_config['windows_locale'][$q_config['language']];
 	$locale[] = $q_config['language'];
-
+	
 	// return the correct locale and most importantly set it (wordpress doesn't, which is bad)
 	// only set LC_TIME as everyhing else doesn't seem to work with windows
 	setlocale(LC_TIME, $locale);
-
+	
 	return $q_config['locale'][$q_config['language']];
 }
 
@@ -76,14 +76,14 @@ function qtrans_optionFilter($do = true) {
 						'option_widget_rss',
 						'option_widget_tag_cloud'
 					);
-
-	foreach($options as $option) {
+	
+	foreach ($options as $option) {
 		if ($do)
 			add_filter($option, 'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage',0);
 		else
 			remove_filter($option, 'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage');
-		}
 	}
+}
 
 function qtrans_adminHeader() {
 	echo "<style type=\"text/css\" media=\"screen\">\n";
@@ -108,7 +108,7 @@ function qtrans_adminHeader() {
 function qtrans_useCurrentLanguageIfNotFoundShowAvailable($content) {
 	if (!defined('QTRANS_INIT'))
 		return $content;
-
+	
 	global $q_config;
 	return qtrans_use($q_config['language'], $content, true);
 }
@@ -116,7 +116,7 @@ function qtrans_useCurrentLanguageIfNotFoundShowAvailable($content) {
 function qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage($content) {
 	if (!defined('QTRANS_INIT'))
 		return $content;
-
+	
 	global $q_config;
 	return qtrans_use($q_config['language'], $content, false);
 }
@@ -131,7 +131,7 @@ function qtrans_excludeUntranslatedPosts($where) {
 	if($q_config['hide_untranslated'] && !is_singular()) {
 		$where .= " AND $wpdb->posts.post_content LIKE '%<!--:".qtrans_getLanguage()."-->%'";
 	}
-	 return $where;
+	return $where;
 }
 
 function qtrans_excludePages($pages) {
@@ -162,7 +162,7 @@ function qtrans_links($links, $file){ // copied from Sociable Plugin
 	//Static so we don't call plugin_basename on every plugin row.
 	static $this_plugin;
 	if (!$this_plugin) $this_plugin = plugin_basename(dirname(__FILE__).'/mqtranslate.php');
-
+	
 	if ($file == $this_plugin){
 		$settings_link = '<a href="options-general.php?page=mqtranslate">' . __('Settings', 'mqtranslate') . '</a>';
 		array_unshift( $links, $settings_link ); // before other links
@@ -192,7 +192,7 @@ function qtrans_languageColumn($column) {
 			$available_languages_name[] = $q_config['language_name'][$language];
 		}
 		$available_languages_names = join(", ", $available_languages_name);
-
+		
 		echo apply_filters('mqtranslate_available_languages_names',$available_languages_names);
 		do_action('mqtranslate_languageColumn', $available_languages, $missing_languages);
 	}
@@ -218,7 +218,7 @@ function qtrans_useRawTitle($title, $raw_title = '', $context = 'save') {
 
 function qtrans_checkCanonical($redirect_url, $requested_url) {
 	// fix canonical conflicts with language urls
-	if(qtrans_convertURL($redirect_url)==qtrans_convertURL($requested_url))
+	if(qtrans_convertURL($redirect_url)==qtrans_convertURL($requested_url)) 
 		return false;
 	return $redirect_url;
 }
@@ -256,18 +256,15 @@ add_action('link_category_edit_form',		'qtrans_modifyTermFormFor');
 add_action('category_add_form',				'qtrans_modifyTermFormFor');
 add_action('post_tag_add_form',				'qtrans_modifyTermFormFor');
 add_action('link_category_add_form',		'qtrans_modifyTermFormFor');
-add_action('widgets_init',					'qtrans_widget_init');
+add_action('widgets_init',					'qtrans_widget_init'); 
 add_action('plugins_loaded',				'qtrans_init', 2);
 add_action('init', 							'qtrans_postInit');
 add_action('admin_head',					'qtrans_adminHeader');
 add_action('admin_menu',					'qtrans_adminMenu');
 add_action('wp_before_admin_bar_render',	'qtrans_fixAdminBar');
 add_action('wp_tiny_mce_init', 				'qtrans_TinyMCE_init');
-add_action('pre_post_update',				'qtrans_testToDisableTranslation');
-add_action('admin_notices',					'qtrans_testToDisableTranslation');
-add_action('admin_notices', 				'qtrans_admin_notice_disabled_bypost');
 
-// Hooks (execution time critical filters)
+// Hooks (execution time critical filters) 
 add_filter('the_content',					'qtrans_useCurrentLanguageIfNotFoundShowAvailable', 0);
 add_filter('the_excerpt',					'qtrans_useCurrentLanguageIfNotFoundShowAvailable', 0);
 add_filter('the_excerpt_rss',				'qtrans_useCurrentLanguageIfNotFoundShowAvailable', 0);
@@ -312,7 +309,7 @@ add_filter( "_wp_post_revision_field_post_content", 'qtrans_showAllSeperated', 0
 add_filter( "_wp_post_revision_field_post_excerpt", 'qtrans_showAllSeperated', 0);
 add_filter('get_the_author_description', 	'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage');
 
-// Hooks (execution time non-critical filters)
+// Hooks (execution time non-critical filters) 
 add_filter('author_feed_link',				'qtrans_convertURL');
 add_filter('author_link',					'qtrans_convertURL');
 add_filter('author_feed_link',				'qtrans_convertURL');
@@ -351,17 +348,17 @@ add_filter('redirect_canonical',			'qtrans_checkCanonical', 10, 2);
 if(!defined('WP_ADMIN')) {
 	add_filter('the_posts',					'qtrans_postsFilter');
 	add_filter('wp_setup_nav_menu_item',	'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage');
-
+	
 	// Compability with Default Widgets
 	qtrans_optionFilter();
 	add_filter('widget_title',				'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage',0);
 	add_filter('widget_text',				'qtrans_useCurrentLanguageIfNotFoundUseDefaultLanguage',0);
-
+	
 	// filter options
 	add_filter('esc_html',					'qtrans_esc_html', 0);
 	// don't filter untranslated posts in admin
 	add_filter('posts_where_request',		'qtrans_excludeUntranslatedPosts');
-
+	
 	// leave terms in default language
 	add_filter('cat_row',					'qtrans_useTermLib',0);
 	add_filter('cat_rows',					'qtrans_useTermLib',0);

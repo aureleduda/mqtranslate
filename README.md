@@ -1,15 +1,16 @@
-=== mqTranslate ===
-Contributors: chsxf, michel.weimerskirch
-Tags: multilingual, language, admin, tinymce, bilingual, widget, switcher, i18n, l10n, multilanguage, professional, translation, service, human
-Requires at least: 3.9
-Tested up to: 4.2
+mqTranslate
+===========
+Contributors: chsxf, michel.weimerskirch  
+Tags: multilingual, language, admin, tinymce, bilingual, widget, switcher, i18n, l10n, multilanguage, professional, translation, service, human  
+Requires at least: 3.9  
+Tested up to: 4.2  
 Stable tag: 2.10.1
 License: GPLv2
 
-DEPRECATED in favor of qTranslate X. Based on qTranslate, adds userfriendly multilingual content management and translation support, with collaborative and team-oriented extensions.
+**DEPRECATED in favor of [qTranslate X](http://wordpress.org/plugins/qtranslate-x/).** Based on qTranslate, adds userfriendly multilingual content management and translation support, with collaborative and team-oriented extensions.
 
-== Description ==
-
+Description
+-----------
 **As of February 19th, 2015, this plugin has been deprecated in favor of [qTranslate X](http://wordpress.org/plugins/qtranslate-x/).**
 
 Writing multilingual content is already hard enough, why make using a plugin even more complicated? qTranslate has been created to let Wordpress have an easy to use interface for managing a fully multilingual web site.
@@ -42,7 +43,8 @@ For more Information on mqTranslate, visit the [Plugin Homepage](http://www.xhal
 Flags in flags directory are made by Luc Balemans and downloaded from FOTW Flags Of The World website at
 [http://flagspot.net/flags/](http://www.crwflags.com/FOTW/FLAGS/wflags.html)
 
-== Installation ==
+Installation
+------------
 
 **As of February 19th, 2015, this plugin has been deprecated in favor of [qTranslate X](http://wordpress.org/plugins/qtranslate-x/).**
 
@@ -64,7 +66,8 @@ If your install does not include qTranslate, you can go with it:
 * Activate mqTranslate
 * Add the mqTranslate Widget to let your visitors switch the language.
 
-== Frequently Asked Questions ==
+Frequently Asked Questions
+--------------------------
 
 **As of February 19th, 2015, this plugin has been deprecated in favor of [qTranslate X](http://wordpress.org/plugins/qtranslate-x/).**
 
@@ -74,13 +77,8 @@ For Problems with the original qTranslate features, visits the [qTranslate Suppo
 
 For Problems with mqTranslate-specific features, visits [our Support Page](http://wordpress.org/support/plugin/mqtranslate).
 
-== Screenshots ==
-
-1. Wordpress Editor with mqTranslate
-2. Language Management Interface
-3. qTranslate Services (Translation)
-
-== Changelog ==
+Changelog
+---------
 
 2.10.1:
 
@@ -306,7 +304,8 @@ For Problems with mqTranslate-specific features, visits [our Support Page](http:
 
 - Initial version
 
-== Upgrade Notice ==
+Upgrade Notice
+--------------
 
 WARNING!
 Original qTranslate software provides a specific version of the plugin for each version of WordPress. qTranslate is only compatible with the WordPress version it has been designed for.

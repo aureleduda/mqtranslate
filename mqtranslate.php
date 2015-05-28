@@ -2,8 +2,8 @@
 /*
 Plugin Name: mqTranslate
 Plugin URI: http://wordpress.org/plugins/mqtranslate/
-Description: Adds userfriendly multilingual content support into Wordpress. mqTranslate is a fork of the well-known <a href="http://www.qianqin.de/mqtranslate/">qTranslate</a> plugin by <a href="http://www.qianqin.de/">Qian Qin</a>, extending the original software with collaborative and team-oriented features.
-Version: 2.8
+Description: <strong>DEPRECATED - Try <a href="http://wordpress.org/plugins/qtranslate-x>qTranslate X</a></strong> - Adds userfriendly multilingual content support into Wordpress. mqTranslate is a fork of the well-known <a href="http://www.qianqin.de/mqtranslate/">qTranslate</a> plugin by <a href="http://www.qianqin.de/">Qian Qin</a>, extending the original software with collaborative and team-oriented features.
+Version: 2.10.1
 Author: xhaleera
 Author URI: http://www.xhaleera.com
 Tags: multilingual, multi, language, admin, tinymce, mqTranslate, Polyglot, bilingual, widget, switcher, professional, human, translation, service
@@ -13,10 +13,10 @@ Tags: multilingual, multi, language, admin, tinymce, mqTranslate, Polyglot, bili
 	FOTW Flags Of The World website at http://flagspot.net/flags/
 	(http://www.crwflags.com/FOTW/FLAGS/wflags.html)
 */
-/*
+/*  
 	Original qTranslate source code
 	Copyright 2008  Qian Qin  (email : mail@qianqin.de)
-
+	
 	mqTranslate
 	Copyright 2013  Christophe SAUVEUR - xhaleera  (email : support@xhaleera.com)
 
@@ -42,17 +42,16 @@ Tags: multilingual, multi, language, admin, tinymce, mqTranslate, Polyglot, bili
 	fi by Tatu Siltanen
 	fr by Damien Choizit
 	nl by RobV
-	sv by bear3556, johdah
+	sv by bear3556, johdah 
 	it by Lorenzo De Tomasi
 	ro, hu by Jani Monoses
 	ja by Brian Parker
 	es by June
 	vi by hathhai
 	ar by Mohamed Magdy
-	pt by netolazaro
+	pt by netolazaro and Pedro Mendonça
 	gl by Andrés Bott
-	sr by Borisa Djuraskovic from WebHostingHub <http://www.webhostinghub.com>
-
+	
 	Plugin Translation Contributers
 	===============================
 	en, de by Qian Qin
@@ -78,15 +77,66 @@ Tags: multilingual, multi, language, admin, tinymce, mqTranslate, Polyglot, bili
 	ru by viaestvita
 	ro by ipuiu
 	sv by tobi
-
+	
 	Sponsored Features
 	==================
 	Excerpt Translation by bastiaan van rooden (www.nothing.ch)
+	sr translation by Borisa Djuraskovic from WebHostingHub <http://www.webhostinghub.com>
 
 	Specials thanks
 	===============
 	All Supporters! Thanks for all the donations!
 */
+
+function print_deprecation() {
+	if (!current_user_can('manage_options') || !empty($_COOKIE['mqtranslate-deprecation-message-dismissed']))
+		return;
+?>
+<div class="error" id="mqtranslate-deprecation-message-container">
+	<p><strong>DEPRECATION NOTICE</strong></p>
+	<p>As of February 19th, 2015, mqTranslate has been deprecated in favor of <a href="plugin-install.php?tab=search&s=qtranslate-x">qTranslate X</a>.</p>
+	<p><em>Deprecation does not mean mqTranslate stops working right now, but that the plugin won't receive updates or new features anymore. mqTranslate should work correctly until the release of WordPress 4.3, planned in August this year. It gives you the time to find a decent alternative, such as qTranslate X.</em></p>
+	<p><button type="button" id="mqtranslate-deprecation-message-dismiss">Dismiss</button></p>
+</div>
+<script type="text/javascript">
+/* <![CDATA[ */
+jQuery(function() {
+	jQuery('#mqtranslate-deprecation-message-dismiss').click(function(event) {
+		event.preventDefault();
+		jQuery('#mqtranslate-deprecation-message-container').remove();
+
+		var d = new Date( Date.now() + 86400000 * 365 * 5 );
+		document.cookie = 'mqtranslate-deprecation-message-dismissed=1;expires=' + d.toUTCString();
+	});
+});
+/* ]]> */
+</script>
+<?php 
+}
+add_action('admin_notices', 'print_deprecation');
+
+function mqtranslate_activation_check() {
+	$plugins = array(
+			'qTranslate' => 'qtranslate/qtranslate.php',
+			'zTranslate' => 'ztranslate/ztranslate.php',
+			'qTranslate-X' => 'qtranslate-x/qtranslate.php',
+			'qTranslate Plus' => 'qtranslate-xp/ppqtranslate.php'
+	);
+	
+	$msg = __("Sorry, but mqTranslate can not be activated. You have to deactivate %s first.", 'mqtranslate');
+	
+	foreach ($plugins as $k => $v) {
+		if ( is_plugin_active( $v ) ) {
+			deactivate_plugins(__FILE__); // Deactivate ourself
+			wp_die( sprintf($msg, $k) );
+		}
+	}
+}
+register_activation_hook(__FILE__, 'mqtranslate_activation_check');
+
+if (function_exists('qtrans_init'))
+	return;
+
 /* DEFAULT CONFIGURATION PART BEGINS HERE */
 
 /* There is no need to edit anything here! */
@@ -94,13 +144,12 @@ Tags: multilingual, multi, language, admin, tinymce, mqTranslate, Polyglot, bili
 // mqTranslate Editor will only activated for the given version of Wordpress.
 // Can be changed to use with other versions but might cause problems and/or data loss!
 define('QT_MIN_SUPPORTED_WP_MINOR_VERSION', '3.9');
-define('QT_MAX_SUPPORTED_WP_MAJOR_VERSION', '4.0');
+define('QT_MAX_SUPPORTED_WP_MAJOR_VERSION', '4.2');
 define('QT_STRING',		1);
 define('QT_BOOLEAN',	2);
 define('QT_INTEGER',	3);
 define('QT_URL',		4);
 define('QT_LANGUAGE',	5);
-define('QT_ARRAY',		6);
 define('QT_URL_QUERY',	1);
 define('QT_URL_PATH',	2);
 define('QT_URL_DOMAIN',	3);
@@ -112,11 +161,8 @@ define('QT_STRFTIME',			4);
 // enable the use of following languages (order=>language)
 $q_config['enabled_languages'] = array(
 		'0' => 'de',
-		'1' => 'en',
+		'1' => 'en', 
 		'2' => 'zh'
-	);
-$q_config['ignored_custompost'] = array(
-
 	);
 
 // sets default language
@@ -135,7 +181,7 @@ $q_config['auto_update_mo'] = true;
 // hide language tag for default language
 $q_config['hide_default_language'] = true;
 
-// sets default url mode
+// sets default url mode 
 // QT_URL_QUERY - query (questionmark)
 // QT_URL_PATH - pre-path
 // QT_URL_DOMAIN - pre-domain
@@ -474,20 +520,28 @@ $q_config['allowed_custom_post_types'] = array();
 // Disable CSS in head
 $q_config['disable_header_css'] = 0;
 
-// Load mqTranslate
-require_once(dirname(__FILE__)."/mqtranslate_javascript.php");
-require_once(dirname(__FILE__)."/mqtranslate_utils.php");
-require_once(dirname(__FILE__)."/mqtranslate_core.php");
-require_once(dirname(__FILE__)."/mqtranslate_wphacks.php");
-require_once(dirname(__FILE__)."/mqtranslate_widget.php");
-require_once(dirname(__FILE__)."/mqtranslate_configuration.php");
+// Cookie settings
+$q_config['disable_client_cookies'] = 0;
+$q_config['use_secure_cookie'] = 0;
 
-// load qTranslate Services if available
-if(file_exists(dirname(__FILE__)."/mqtranslate_services.php"))
-	require_once(dirname(__FILE__)."/mqtranslate_services.php");
+// Optimisation settings
+$q_config['filter_all_options'] = 1;
 
-// set hooks at the end
-require_once(dirname(__FILE__)."/mqtranslate_hooks.php");
-
-require_once(dirname(__FILE__)."/mqtranslate_xhaleera_addons.php");
-?>
+//if (!function_exists('is_plugin_active') || is_plugin_active( 'mqtranslate/mqtranslate.php' )) {
+	// Load mqTranslate
+	require_once(dirname(__FILE__)."/mqtranslate_javascript.php");
+	require_once(dirname(__FILE__)."/mqtranslate_utils.php");
+	require_once(dirname(__FILE__)."/mqtranslate_core.php");
+	require_once(dirname(__FILE__)."/mqtranslate_wphacks.php");
+	require_once(dirname(__FILE__)."/mqtranslate_widget.php");
+	require_once(dirname(__FILE__)."/mqtranslate_configuration.php");
+	
+	// load qTranslate Services if available
+	if(file_exists(dirname(__FILE__)."/mqtranslate_services.php"))
+		require_once(dirname(__FILE__)."/mqtranslate_services.php");
+	
+	// set hooks at the end
+	require_once(dirname(__FILE__)."/mqtranslate_hooks.php");
+	
+	require_once(dirname(__FILE__)."/mqtranslate_xhaleera_addons.php");
+//}
